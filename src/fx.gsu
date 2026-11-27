@@ -1,0 +1,869 @@
+; =============================================================================
+; Super FX renderer: polygon fighters.  Limbs are tapered quads, joints / heads / hair
+; are octagons; each is drawn in layers (dark rim, mid face, lit strip) for a
+; flat-shaded, lit look.  Runs entirely from Game Pak RAM (bank $70).
+;
+; RAM:  $0000 vars | $0040 VX[8] | $0050 VY[8] | $0800 OBJ screen (tiles 0..191)
+;       $2000 reciprocal table | $4000 this code | $6000 / $6200 display lists:
+;         +0 W  +2 H  +4 BW  +6 FB  +8 N, then N x 8 bytes:
+;         colour (bit 7 = segment), wA (radius), wB, ax+64, ay+64, bx+64, by+64, 0
+; Polygon x coordinates carry a +64 bias (so they stay positive); y does not.
+; =============================================================================
+RCP    = $2000
+CIRC   = $2200
+V_RET2 = 14
+V_CBASE = 112
+DL0    = $6000
+DL1    = $6400
+V_OX   = 114
+V_OY   = 116
+P_DX8  = 118
+P_DY8  = 120
+P_UX   = 122
+P_UY   = 124
+P_K2   = 126
+P_NP   = 128
+P_SP   = 130
+E_SH   = 132
+P_OUT  = 134
+P_TOPY = 136
+P_COL  = 138
+P_X0   = 140
+P_X1   = 142
+INK    = 15
+VX     = $C0
+VY     = $E0
+V_W    = 0
+V_H    = 2
+V_BW   = 4
+V_FB   = 6
+V_N    = 8
+V_PTR  = 10
+V_RET  = 12
+V_W1   = 16
+E_CB   = 18
+E_A    = 20
+E_B    = 22
+E_AX   = 24
+E_AY   = 26
+E_BX   = 28
+E_BY   = 30
+P_N    = 32
+P_BOT  = 36
+A_I    = 38
+A_END  = 40
+B_I    = 42
+B_END  = 44
+B_SL   = 46
+V_RET3 = 48
+L_AX   = 96
+L_AY   = 98
+L_BX   = 100
+L_BY   = 102
+L_WA   = 104
+L_WB   = 106
+E_O    = 108
+E_M    = 110
+HILITE = 13
+
+.org $4000
+start:  cache                           ; cache window = the per-scanline code below
+        iwt     r15,#init
+        nop
+
+; ---- convex polygon fill: VX/VY[0..P_N-1], any winding.  Returns via r11.
+poly:   sms     (V_RET3),r11
+        iwt     r1,#$7FFF               ; top y
+        iwt     r2,#$8000               ; bottom y
+        ibt     r3,#0                   ; vertex offset
+        ibt     r4,#0                   ; top vertex offset
+        lms     r12,(P_N)
+        iwt     r8,#VY
+pt:     to r0
+        ldw     (r8)
+        from r0
+        cmp     r1
+        bge     pt1
+        nop
+        move    r1,r0
+        move    r4,r3
+pt1:    from r0
+        cmp     r2
+        blt     pt2
+        nop
+        move    r2,r0
+pt2:    inc     r8
+        inc     r8
+        inc     r3
+        inc     r3
+        dec     r12
+        bne     pt
+        sms     (P_BOT),r2
+        moves   r2,r2                   ; entirely above the box?
+        lbmi    pout
+        lms     r0,(V_H)                ; ... or below it?
+        from r1
+        cmp     r0
+        lbge    pout
+        sms     (A_I),r4
+        sms     (B_I),r4
+        sms     (P_TOPY),r1
+        move    r7,r1                   ; y = top
+        sms     (A_END),r7
+        sms     (B_END),r7
+        iwt     r0,#VX                  ; both chains start at the top vertex
+        add     r4
+        to r3
+        ldw     (r0)
+        with r3
+        swap
+        iwt     r1,#$0080
+        with r3
+        or      r1
+        move    r5,r3
+        ibt     r4,#0
+        sms     (B_SL),r4
+        move    r6,r7
+        bra     prow
+        nop
+pout:   lms     r11,(V_RET3)
+        jmp     r11
+
+prow:   from r7                         ; fast path: no edge ends on this row
+        cmp     r6
+        blt     pspan
+        lms     r0,(P_BOT)              ; advance a chain whose edge has ended (not on the last row)
+        from r7
+        cmp     r0
+        bge     pev
+pa:     lms     r0,(A_END)
+        from r7
+        cmp     r0
+        blt     pb
+        link    #4
+        iwt     r15,#advA
+        nop
+        bra     pa
+        nop
+pb:     lms     r0,(B_END)
+        from r7
+        cmp     r0
+        blt     pev
+        link    #4
+        iwt     r15,#advB
+        nop
+        bra     pb
+        nop
+pev:    lms     r6,(A_END)              ; next event row = min(A_END, B_END, bottom)
+        lms     r0,(B_END)
+        from r0
+        cmp     r6
+        bge     pe1
+        nop
+        move    r6,r0
+pe1:    lms     r0,(P_BOT)
+        from r0
+        cmp     r6
+        bge     pspan
+        nop
+        move    r6,r0
+pspan:  hib     r9,r3
+        hib     r10,r5
+        from r10
+        cmp     r9
+        bge     ps1
+        nop
+        move    r0,r9
+        move    r9,r10
+        move    r10,r0
+ps1:    iwt     r0,#64
+        with r9
+        sub     r0
+        with r10
+        sub     r0
+        moves   r9,r9
+        bpl     ps2
+        nop
+        ibt     r9,#0
+ps2:    lms     r0,(V_W1)
+        from r10
+        cmp     r0
+        blt     ps3
+        nop
+        move    r10,r0
+ps3:    from r10
+        cmp     r9
+        blt     psk
+        lms     r0,(V_BW)
+        and     #1
+        lbne    psslow                  ; 3x2 box: general path
+        moves   r7,r7                   ; row inside the box?
+        bmi     psk
+        lms     r0,(V_H)
+        from r7
+        cmp     r0
+        bge     psk
+        lms     r1,(V_FB)               ; 2x3 box: plot straight from the row
+        with r1
+        add     r9
+        move    r2,r7
+        sub     r12,r10,r9
+        inc     r12
+        lms     r0,(P_OUT)
+        moves   r0,r0
+        bne     psfo
+        move    r13,r15
+        loop
+>       plot
+        bra     psk
+        nop
+psfo:   ibt     r0,#INK                 ; outlined polygon
+        color
+        lms     r0,(P_TOPY)
+        from r7
+        cmp     r0
+        beq     psfi
+        lms     r0,(P_BOT)
+        from r7
+        cmp     r0
+        beq     psfi
+        plot                            ; left end
+        dec     r12
+        beq     psfr
+        dec     r12
+        beq     psfe
+        lms     r0,(P_COL)
+        color
+        move    r13,r15
+        loop
+>       plot
+        ibt     r0,#INK
+        color
+psfe:   plot                            ; right end
+psfr:   lms     r0,(P_COL)
+        color
+        bra     psk
+        nop
+psfi:   move    r13,r15                 ; first / last row: all ink
+        loop
+>       plot
+        lms     r0,(P_COL)
+        color
+        bra     psk
+        nop
+psk:    with r3
+        add     r4
+        lms     r0,(B_SL)
+        with r5
+        add     r0
+        inc     r7
+        lms     r0,(P_BOT)
+        from r0
+        cmp     r7
+        blt     pdone
+        iwt     r15,#prow
+        nop
+pdone:  lms     r11,(V_RET3)
+        jmp     r11
+
+; ---- general row path for 3x2 boxes (span splits at the 64 px column)
+psslow:
+        lms     r0,(P_OUT)
+        moves   r0,r0
+        bne     pso
+        link    #4                      ; plain polygon
+        iwt     r15,#span
+        nop
+        iwt     r15,#psk
+        nop
+pso:    lms     r0,(P_TOPY)             ; outlined: first and last rows all ink
+        from r7
+        cmp     r0
+        beq     psink
+        lms     r0,(P_BOT)
+        from r7
+        cmp     r0
+        beq     psink
+        ibt     r0,#INK                 ; ... otherwise ink at both ends
+        color
+        sms     (P_X0),r9
+        sms     (P_X1),r10
+        move    r10,r9
+        link    #4
+        iwt     r15,#span
+        nop
+        lms     r9,(P_X1)
+        move    r10,r9
+        link    #4
+        iwt     r15,#span
+        nop
+        lms     r0,(P_COL)
+        color
+        lms     r9,(P_X0)
+        lms     r10,(P_X1)
+        inc     r9
+        dec     r10
+        from r10
+        cmp     r9
+        lblt    psk
+        link    #4
+        iwt     r15,#span
+        nop
+        iwt     r15,#psk
+        nop
+psink:  ibt     r0,#INK
+        color
+        link    #4
+        iwt     r15,#span
+        nop
+        lms     r0,(P_COL)
+        color
+        iwt     r15,#psk
+        nop
+
+; ---- one span: row r7 (box-local), x r9..r10 (clipped).  Keeps r3-r7, r9, r10
+span:   moves   r7,r7
+        bmi     sret
+        lms     r0,(V_H)
+        from r7
+        cmp     r0
+        bge     sret
+        move    r8,r9
+        ibt     r0,#64                  ; left 64 px of the box map 1:1 onto the tiles
+        from r8
+        cmp     r0
+        bge     sright
+        move    r12,r10
+        from r12
+        cmp     r0
+        blt     sl1
+        nop
+        ibt     r12,#63
+sl1:    with r12
+        sub     r8
+        inc     r12
+        lms     r1,(V_FB)
+        with r1
+        add     r8
+        move    r2,r7
+        move    r13,r15
+        loop
+>       plot
+        from r10
+        cmp     r0                      ; r0 = 64 still
+        blt     sret
+        move    r8,r0
+sright: ; 3x2 boxes: x 64..95 lives below, at phys x (ly & ~31) + (x - 64), y 64 + (ly & 31)
+        ibt     r1,#31
+        and     r2,r7,r1
+        ibt     r0,#64
+        add     r2,r2,r0
+        bic     r1,r7,r1
+        with r1
+        add     r8
+        with r1
+        sub     r0
+        lms     r0,(V_FB)
+        with r1
+        add     r0
+        sub     r12,r10,r8
+        inc     r12
+        move    r13,r15
+        loop
+>       plot
+sret:   jmp     r11
+
+; ---- chain A: next vertex forward
+advA:   lms     r1,(A_I)
+        add     r2,r1,#2
+        lms     r0,(P_N)
+        add     r0,r0,r0
+        from r2
+        cmp     r0
+        blt     aa1
+        nop
+        ibt     r2,#0
+aa1:    sms     (A_I),r2
+        iwt     r0,#VX
+        add     r1
+        to r8
+        ldw     (r0)                    ; x0
+        iwt     r0,#VX
+        add     r2
+        to r9
+        ldw     (r0)                    ; x1
+        iwt     r0,#VY
+        add     r1
+        to r1
+        ldw     (r0)                    ; y0
+        iwt     r0,#VY
+        add     r2
+        to r2
+        ldw     (r0)                    ; y1
+        sms     (A_END),r2
+        swap    r3,r8
+        iwt     r6,#$0080
+        with r3
+        or      r6
+        sub     r2,r2,r1                ; dy
+        sub     r1,r9,r8                ; dx
+        moves   r2,r2
+        bne     saa
+        nop
+        ibt     r0,#0
+        bra     saz
+        nop
+saa: ibt     r0,#127
+        from r1
+        cmp     r0
+        blt     sab
+        nop
+        move    r1,r0
+sab: ibt     r0,#-127
+        from r1
+        cmp     r0
+        bge     sac
+        nop
+        move    r1,r0
+sac: lob     r0,r1
+        swap                            ; dx << 8
+        ibt     r6,#1
+        from r2
+        cmp     r6
+        beq     saz
+        iwt     r6,#RCP
+        with r6
+        add     r2
+        with r6
+        add     r2
+        to r6
+        ldw     (r6)                    ; 65536 / dy
+        fmult
+saz:
+        move    r4,r0
+        jmp     r11
+
+; ---- chain B: next vertex backward
+advB:   lms     r1,(B_I)
+        moves   r2,r1
+        bne     ab1
+        nop
+        lms     r2,(P_N)
+        add     r2,r2,r2
+ab1:    dec     r2
+        dec     r2
+        sms     (B_I),r2
+        iwt     r0,#VX
+        add     r1
+        to r8
+        ldw     (r0)
+        iwt     r0,#VX
+        add     r2
+        to r9
+        ldw     (r0)
+        iwt     r0,#VY
+        add     r1
+        to r1
+        ldw     (r0)
+        iwt     r0,#VY
+        add     r2
+        to r2
+        ldw     (r0)
+        sms     (B_END),r2
+        swap    r5,r8
+        iwt     r6,#$0080
+        with r5
+        or      r6
+        sub     r2,r2,r1
+        sub     r1,r9,r8
+        moves   r2,r2
+        bne     sba
+        nop
+        ibt     r0,#0
+        bra     sbz
+        nop
+sba: ibt     r0,#127
+        from r1
+        cmp     r0
+        blt     sbb
+        nop
+        move    r1,r0
+sbb: ibt     r0,#-127
+        from r1
+        cmp     r0
+        bge     sbc
+        nop
+        move    r1,r0
+sbc: lob     r0,r1
+        swap                            ; dx << 8
+        ibt     r6,#1
+        from r2
+        cmp     r6
+        beq     sbz
+        iwt     r6,#RCP
+        with r6
+        add     r2
+        with r6
+        add     r2
+        to r6
+        ldw     (r6)                    ; 65536 / dy
+        fmult
+sbz:
+        sms     (B_SL),r0
+        jmp     r11
+
+; ---- filled circle: r3 = cx (box-local), r4 = cy, r5 = radius (0..31), colour set.
+; rows in mirrored pairs (cy + dy, cy - dy) sharing one half-width lookup
+circle: sms     (V_RET2),r11
+        add     r0,r5,r5
+        add     r0,r0,r0
+        add     r0,r0,r0
+        add     r0,r0,r0
+        add     r0,r0,r0                ; r*32
+        iwt     r1,#CIRC
+        add     r1
+        sms     (V_CBASE),r0
+        ibt     r6,#0                   ; dy
+crow:   lms     r0,(V_CBASE)
+        add     r6
+        to r8
+        ldb     (r0)                    ; half width
+        sub     r9,r3,r8                ; x0
+        bpl     cx0
+        nop
+        ibt     r9,#0
+cx0:    add     r10,r3,r8               ; x1
+        lms     r0,(V_W1)
+        from r10
+        cmp     r0
+        blt     cx1
+        nop
+        move    r10,r0
+cx1:    from r10
+        cmp     r9
+        blt     cnext
+        add     r7,r4,r6
+        link    #4
+        iwt     r15,#span
+        nop
+        moves   r6,r6
+        beq     cnext
+        sub     r7,r4,r6
+        link    #4
+        iwt     r15,#span
+        nop
+cnext:  inc     r6
+        from r5
+        cmp     r6
+        bge     crow
+        lms     r11,(V_RET2)
+        jmp     r11
+
+; ---- one display-list entry:
+;   part: flags ($40 | flip), k/2, shape address, A, B (screen)
+;   disc (effects): colour, radius, -, centre
+ball:   to r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        hib     r1,r0
+        sms     (E_A),r1
+        lob
+        sms     (E_CB),r0
+        to r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sms     (E_SH),r0
+        lms     r1,(V_OX)
+        lms     r2,(V_OY)
+        to r0
+        ldw     (r10)                   ; screen ax -> box-local + 64
+        inc     r10
+        inc     r10
+        sub     r1
+        add     #15
+        add     #15
+        add     #15
+        add     #15
+        add     #4
+        sms     (E_AX),r0
+        to r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sub     r2
+        sms     (E_AY),r0
+        to r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sub     r1
+        add     #15
+        add     #15
+        add     #15
+        add     #15
+        add     #4
+        sms     (E_BX),r0
+        to r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sub     r2
+        sms     (E_BY),r0
+        sms     (V_PTR),r10
+        lms     r0,(E_CB)
+        ibt     r1,#$40
+        and     r1
+        bne     part
+        ; ---- effect disc: one flat circle
+        lms     r0,(E_CB)
+        color
+        lms     r3,(E_AX)
+        iwt     r0,#64
+        with r3
+        sub     r0
+        lms     r4,(E_AY)
+        lms     r5,(E_A)
+        link    #4
+        iwt     r15,#circle
+        nop
+        iwt     r15,#bnext
+        nop
+
+; ---- sculpted part: polygons in bone space (s, o) around A -> B
+part:   lms     r0,(E_BX)
+        lms     r1,(E_AX)
+        sub     r1
+        move    r8,r0                   ; dx
+        lms     r0,(E_BY)
+        lms     r1,(E_AY)
+        sub     r1
+        move    r9,r0                   ; dy
+        ; |dx|, |dy| -> length ~ max + min/2
+        moves   r1,r8
+        bpl     pl1
+        nop
+        not     r1,r1
+        inc     r1
+pl1:    moves   r2,r9
+        bpl     pl2
+        nop
+        not     r2,r2
+        inc     r2
+pl2:    from r1
+        cmp     r2
+        bge     pl3
+        nop
+        move    r0,r1
+        move    r1,r2
+        move    r2,r0                   ; r1 = max, r2 = min
+pl3:    lsr     r2,r2
+        add     r1,r1,r2
+        moves   r1,r1
+        bne     pl4
+        nop
+        inc     r1
+pl4:    iwt     r6,#RCP
+        with r6
+        add     r1
+        with r6
+        add     r1
+        to r6
+        ldw     (r6)                    ; 65536 / length
+        ; unit perpendicular (-dy, dx) / length, 8.8
+        ibt     r0,#0
+        sub     r9
+        lob
+        swap
+        to r1
+        fmult
+        lob     r0,r8
+        swap
+        to r2
+        fmult
+        lms     r0,(E_CB)               ; facing the other way: mirror the offsets
+        and     #1
+        beq     pl5
+        nop
+        not     r1,r1
+        inc     r1
+        not     r2,r2
+        inc     r2
+pl5:    sms     (P_UX),r1
+        sms     (P_UY),r2
+        add     r0,r8,r8                ; dx * 8, dy * 8 (for s / 32)
+        add     r0,r0,r0
+        add     r0,r0,r0
+        sms     (P_DX8),r0
+        add     r0,r9,r9
+        add     r0,r0,r0
+        add     r0,r0,r0
+        sms     (P_DY8),r0
+        lms     r0,(E_A)
+        sms     (P_K2),r0
+        lms     r10,(E_SH)
+        to r0
+        ldb     (r10)
+        inc     r10
+        sms     (P_NP),r0
+ppoly:  to r0
+        ldb     (r10)                   ; colour (bit 7: ink border)
+        inc     r10
+        iwt     r1,#$80
+        and     r1,r0,r1
+        sms     (P_OUT),r1
+        iwt     r1,#$7F
+        and     r1
+        sms     (P_COL),r0
+        color
+        lms     r5,(P_K2)               ; per-polygon register cache
+        lms     r11,(E_AX)
+        lms     r13,(E_AY)
+        to r12
+        ldb     (r10)                   ; points (1..16)
+        inc     r10
+        moves   r12,r12
+        bne     pnz
+        nop
+        iwt     r15,#pskip
+        nop
+pnz:    sms     (P_N),r12
+        iwt     r3,#VX
+        iwt     r4,#VY
+ppt:    to r0
+        ldb     (r10)                   ; s (1/32 of the bone)
+        inc     r10
+        swap
+        move    r7,r0
+        lms     r6,(P_DX8)
+        from r7
+        to r8
+        fmult
+        lms     r6,(P_DY8)
+        from r7
+        to r9
+        fmult
+        to r0
+        ldb     (r10)                   ; o (quarter units)
+        inc     r10
+        mult    r5                      ; o * k/2
+        move    r7,r0
+        lms     r6,(P_UX)
+        from r7
+        to r1
+        fmult
+        lms     r6,(P_UY)
+        from r7
+        to r2
+        fmult
+        from r11
+        to r0
+        add     r8
+        add     r1
+        stw     (r3)
+        inc     r3
+        inc     r3
+        from r13
+        to r0
+        add     r9
+        add     r2
+        stw     (r4)
+        inc     r4
+        inc     r4
+        dec     r12
+        bne     ppt
+        sms     (P_SP),r10
+        link    #4
+        iwt     r15,#poly
+        nop
+        lms     r10,(P_SP)
+pskip:
+        lms     r0,(P_NP)
+        dec     r0
+        sms     (P_NP),r0
+        bne     ppoly
+bnext:  lms     r10,(V_PTR)
+        lms     r0,(V_N)
+        dec     r0
+        sms     (V_N),r0
+        beq     fdone
+        iwt     r15,#ball
+        nop
+fdone:  lms     r11,(V_RET)
+        ret
+
+; ---- cold code: per-frame setup, display list header
+cold:
+init:
+        ibt     r0,#0
+        ramb
+        ibt     r0,#$10                 ; OBJ plot mode
+        cmode
+        ; clear tiles 0..191 ($0800..$1FFF)
+        iwt     r3,#$0800
+        iwt     r12,#768
+        ibt     r0,#0
+        move    r13,r15
+clr:    stw     (r3)
+        inc     r3
+        inc     r3
+        stw     (r3)
+        inc     r3
+        inc     r3
+        stw     (r3)
+        inc     r3
+        inc     r3
+        stw     (r3)
+        inc     r3
+        loop
+>       inc     r3
+        iwt     r10,#DL0
+        call    fighter
+        iwt     r10,#DL1
+        call    fighter
+        rpix                            ; flush the pixel cache
+        stop
+        nop
+
+fighter:
+        sms     (V_RET),r11
+        to r0
+        ldw     (r10)
+        sms     (V_W),r0
+        dec     r0
+        sms     (V_W1),r0
+        inc     r10
+        inc     r10
+        ldw     (r10)
+        sms     (V_H),r0
+        inc     r10
+        inc     r10
+        ldw     (r10)
+        sms     (V_BW),r0
+        inc     r10
+        inc     r10
+        ldw     (r10)
+        sms     (V_FB),r0
+        inc     r10
+        inc     r10
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sms     (V_N),r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sms     (V_OX),r0
+        ldw     (r10)
+        inc     r10
+        inc     r10
+        sms     (V_OY),r0
+        lms     r0,(V_N)
+        moves   r0,r0
+        bne     tball
+        nop
+        lms     r11,(V_RET)
+        ret
+tball:  iwt     r15,#ball
+        nop

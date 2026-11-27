@@ -1,0 +1,13 @@
+poke 2 0x982 1
+shot 400
+shot 700
+shot 1000
+shot 1300
+shot 1600
+shot 1900
+shot 2200
+shot 2500
+shot 2800
+shot 3100
+shot 3400
+shot 3700

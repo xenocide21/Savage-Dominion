@@ -1,0 +1,9 @@
+poke 550 0x948 1
+poke 550 0x91e 4
+poke 550 0x9bc 3
+220 222 S
+300 302 a
+540 541 y
+shot 900
+shot 1000
+shot 1100

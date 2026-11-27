@@ -1,0 +1,7 @@
+shot 20
+shot 60
+shot 130
+shot 250
+shot 330
+shot 360
+shot 420

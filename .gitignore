@@ -1,0 +1,4 @@
+build/
+*.sfc
+*.srm
+__pycache__/

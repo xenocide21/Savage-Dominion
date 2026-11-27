@@ -1,0 +1,20 @@
+poke 400 0x99e 1
+poke 550 0x946 1
+poke 550 0x920 8
+220 222 S
+300 302 a
+600 640 R
+650 652 y
+720 722 D
+728 730 L
+736 738 D
+744 746 x
+shot 690
+shot 760
+shot 800
+shot 840
+shot 880
+shot 920
+shot 960
+shot 1000
+shot 1060

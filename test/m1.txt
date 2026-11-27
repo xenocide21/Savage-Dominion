@@ -1,0 +1,8 @@
+shot 20
+shot 60
+80 140 R
+shot 140
+150 200 U
+shot 200
+210 300 L
+shot 300
