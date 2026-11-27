@@ -3,7 +3,7 @@
 ; Conventions: routines are entered with A 8-bit (like the rest of the code) unless
 ; marked .a16; X = fighter slot (0 / 2) for per-fighter routines.
 ; Virtual input (fVin): PAD_RIGHT = forward (toward opponent), PAD_LEFT = back,
-; PAD_UP = jump, PAD_DOWN = crouch, R = guard, R+Up / R+Down = sidestep,
+; PAD_UP = jump, PAD_DOWN = crouch, R = guard, 
 ; double-tap forward / back = dash / backdash.
 ; =============================================================================
 .macro MA16
@@ -70,9 +70,9 @@ MR_TOTAL = 10
 ; ---------------------------------------------------------------- match setup
 gameInit:
         .a8
-        ldx     #0
+        ldx     #4                  ; JACK
         stx     fChar
-        ldx     #3
+        ldx     #5                  ; LUNA
         stx     fChar+2
         MA16
         lda     #$ACE1
@@ -178,8 +178,6 @@ newRound:
         sta     hudChg
         MA8
         jsr     facing
-        lda     lineAng
-        sta     camYaw
         ldx     #2
         jsr     framePtr
         rts
@@ -367,6 +365,13 @@ buildInputs:
         ldx     #0
         jsr     aiThink
         bra     @p1
+:       lda     fX+2
+        sec
+        sbc     fX
+        bpl     :+                  ; P1 on the left (or level): right means forward
+        lda     pad
+        jsr     mirrorPad
+        bra     @p1
 :       lda     pad
 @p1:    ldx     phase
         cpx     #PH_FIGHT
@@ -374,22 +379,17 @@ buildInputs:
         lda     #0
 :       ldx     #0
         jsr     setVin
-        ; slot 2: P2 pad (left/right swapped: P2 stands on the right) or the CPU
+        ; slot 2: P2 pad (mirrored while P2 stands on the right) or the CPU
         lda     p2Human
         beq     @cpu
+        lda     fX+2
+        sec
+        sbc     fX
+        bmi     :+                  ; P2 on the left: right already means forward
         lda     pad+2
-        sta     tmp0
-        and     #.loword(~(PAD_LEFT | PAD_RIGHT))
-        sta     tmp1
-        lda     tmp0
-        and     #PAD_RIGHT
-        asl     a
-        ora     tmp1
-        sta     tmp1
-        lda     tmp0
-        and     #PAD_LEFT
-        lsr     a
-        ora     tmp1
+        jsr     mirrorPad
+        bra     @p2
+:       lda     pad+2
         bra     @p2
 @cpu:   lda     gmode
         cmp     #GM_PRACT
@@ -425,6 +425,23 @@ setVin:
         lda     #12
         sta     fBufT,x
 :       rts
+
+; A16 = pad bits -> the same with left and right exchanged
+mirrorPad:
+        .a16
+        sta     tmp0
+        and     #.loword(~(PAD_LEFT | PAD_RIGHT))
+        sta     tmp1
+        lda     tmp0
+        and     #PAD_RIGHT
+        asl     a
+        ora     tmp1
+        sta     tmp1
+        lda     tmp0
+        and     #PAD_LEFT
+        lsr     a
+        ora     tmp1
+        rts
 
 ; ---------------------------------------------------------------- fighter state machine
 fighterTick:
@@ -476,21 +493,7 @@ stNeutral:
         jsr     tryAttack
         bcc     :+
         rts
-:       ; R + Up / Down: sidestep in / out
-        lda     fVin,x
-        and     #PAD_R
-        beq     @noR
-        lda     fVinP,x
-        and     #PAD_UP
-        beq     :+
-        lda     #1
-        jmp     startSide
-:       lda     fVinP,x
-        and     #PAD_DOWN
-        beq     @noR
-        lda     #.loword(-1)
-        jmp     startSide
-@noR:   ; Up: jump (with the forward / back held as drift)
+        ; Up: jump (with the forward / back held as drift)
         lda     fVinP,x
         and     #PAD_UP
         beq     :+
@@ -1749,62 +1752,42 @@ collide:
         jsr     addPos
 @done:  rts
 
-; arena edge: walking stops at the rim; knocked-back fighters fall out (ring out)
+; stage limits: walls at either end, and the fighters can't get further apart than
+; the screen shows.  Everyone stays on the fighting plane.
 bounds:
         .a16
+        stz     fZ,x
         lda     fX,x
-        bpl     :+
-        eor     #$FFFF
-        inc     a
-:       sta     tmp0
-        cmp     #330
-        bcs     @out
-        lda     fZ,x
-        bpl     :+
-        eor     #$FFFF
-        inc     a
-:       cmp     #330
-        bcs     @out
+        bmi     @left
+        cmp     #STAGE_HALF + 1
+        bcc     @sep
+        lda     #STAGE_HALF
+        bra     @wall
+@left:  cmp     #.loword(-STAGE_HALF)
+        bcs     @sep
+        lda     #.loword(-STAGE_HALF)
+@wall:  sta     fX,x
+@sep:   txa
+        eor     #2
+        tay
+        lda     fX,x
+        sec
+        sbc     fX,y
+        bmi     @below
+        cmp     #MAXSEP + 1
+        bcc     @done
+        lda     fX,y
         clc
-        adc     tmp0
-        cmp     #460
-        bcs     @out
-        rts
-@out:   lda     gmode
-        cmp     #GM_PRACT
-        bne     :+
-        lda     fOldX,x                 ; practice: the edge is a wall
+        adc     #MAXSEP
         sta     fX,x
-        lda     fOldZ,x
-        sta     fZ,x
         rts
-:       lda     fState,x
-        cmp     #ST_FALL
-        beq     @ring
-        cmp     #ST_AIR
-        beq     @ring
-        cmp     #ST_THROWN
-        beq     @ring
-        cmp     #ST_HIT
-        bne     :+
-        lda     fPush,x                 ; a strong stagger at the edge also goes over
-        cmp     #300
-        bcs     @ring
-:       cmp     #ST_RINGOUT
-        beq     @rts
-        lda     fOldX,x
+@below: cmp     #.loword(-MAXSEP)
+        bcs     @done
+        lda     fX,y
+        sec
+        sbc     #MAXSEP
         sta     fX,x
-        lda     fOldZ,x
-        sta     fZ,x
-@rts:   rts
-@ring:  lda     #SFX_SPLASH
-        jsr     playSfx
-        lda     #ST_RINGOUT
-        sta     fState,x
-        lda     #200
-        sta     fVY,x
-        lda     #AN_LAUNCHED
-        jmp     setAnim
+@done:  rts
 
 ; ---------------------------------------------------------------- hits
 hitCheck:
@@ -2795,6 +2778,10 @@ toSelect:
         stz     selDone+2
         stz     selT
         stz     ladder
+        lda     #4                      ; the picker opens on JACK (and LUNA for player 2)
+        sta     fChar
+        lda     #5
+        sta     fChar+2
         lda     gmode
         bne     :+
         jsr     oppChar
@@ -3223,12 +3210,14 @@ hudCompose:
         cpx     #256
         bne     :-
         lda     scene
+        cmp     #SC_TITLE
         bne     :+
-        jmp     @fight
-:       cmp     #SC_TITLE
-        bne     @sel
         jsr     bandCompose
         jmp     @out
+:       jsr     bandClear
+        lda     scene
+        bne     @sel
+        jmp     @fight
 @sel:   ldy     #.loword(txtSel)
         lda     gmode
         cmp     #GM_PRACT
@@ -3716,12 +3705,11 @@ aiThink:
         bra     @out
 @d2:    cmp     #165
         bcs     :+
-        lda     #PAD_R                  ; sidestep the attack
+        lda     #BACK                   ; back away and guard
         sta     aiHold,x
         lda     #6
         sta     aiT,x
-        lda     #PAD_UP
-        bra     @press
+        bra     @out
 :       lda     #PAD_Y
 @press: sta     aiPress,x
 @out:   lda     aiHold,x

@@ -1620,8 +1620,8 @@ txtNewRec:   .byte "NEW RECORD!", 0
 txtBackHelp: .byte "B: BACK", 0
 
 ; ---------------------------------------------------------------- home screen band (fight display)
-; BG3 rows 22..26: the logo + a blinking PRESS START
-bandCompose:
+; BG3 rows 22..26: the logo + a blinking PRESS START (blank in every other scene)
+bandClear:
         .a16
         ldx     #0
         lda     #$2000
@@ -1630,6 +1630,13 @@ bandCompose:
         inx
         cpx     #5 * 32 * 2
         bne     :-
+        lda     #1
+        sta     bandDirty
+        rts
+
+bandCompose:
+        .a16
+        jsr     bandClear
         ldy     #0
         ldx     #2 * 2
         lda     #LOGO_H

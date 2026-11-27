@@ -188,19 +188,19 @@ fighter(name="VALKA", styleName="Viking Brawler", mats=dict(top=2, hip=2, thigh=
         stance=pose(py=-4, lean=6, nsh=50, nel=55, fsh=70, fel=70, nhp=24, nkn=14, fhp=-20, fkn=16, head=-2),
         speed=0.95, power=1.12, weight=1.1)
 
-# 5 ROCCO - street boxer: green mohawk, big red gloves, tank top, shades
-fighter(name="ROCCO", styleName="Boxing / MMA", mats=dict(top=2, hip=3, thigh=0, shin=0, feet=2, uarm=0, farm=0, hand=3), male=True,
+# 5 JACK MERCER (rough stand-in, to be remodelled) - boxer: beard, bare torso, black trunks, red gloves
+fighter(name="JACK", styleName="Boxing", mats=dict(top=0, hip=2, thigh=0, shin=0, feet=2, uarm=0, farm=0, hand=3), male=True,
         body=dict(leg=20, torso=23, neck=5, headr=8, shw=11.5, hipw=6.5, uarm=14, farm=13, chestr=11, headsz=8.4),
-        colors=[SKIN["light"], (60, 210, 90), (60, 64, 76), (220, 40, 40)],
+        colors=[SKIN["light"], (92, 52, 30), (44, 40, 52), (220, 40, 40)],
         extra=[(3, (0, 9, 0)), (3, (-6, 8, 0)), (3, (5, 7, 0)), (3, (5, 1, 0))],
         style=dict(hair="mohawk", acc="gloves"),
         stance=pose(py=-6, lean=16, nsh=70, nel=110, fsh=60, fel=120, nhp=20, nkn=22, fhp=-16, fkn=16, head=-10, nhr=4),
         speed=1.08, power=0.95, weight=1.0)
 
-# 6 NOVA - capoeira kickboxer: purple outfit, long ponytail, trailing scarf
-fighter(name="NOVA", styleName="Capoeira", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=0, uarm=0, farm=0, hand=0), male=False,
+# 6 LUNA REYES (rough stand-in, to be remodelled) - capoeira: teal outfit, long ponytail, gold sash
+fighter(name="LUNA", styleName="Capoeira", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=0, uarm=0, farm=0, hand=0), male=False,
         body=dict(leg=23, torso=21, neck=5, headr=7.5, shw=9.5, hipw=6, uarm=14, farm=13, chestr=9, headsz=7.8, hipr=8.5, waist=7.5),
-        colors=[SKIN["brown"], (34, 26, 30), (130, 60, 190), (250, 150, 60)],
+        colors=[SKIN["brown"], (52, 30, 24), (30, 150, 124), (244, 184, 60)],
         extra=[(3, (-7, 4, 0)), (3, (-12, -3, 0)), (3, (-14, -11, 0)), (2, (-6, -2, 3))],
         style=dict(hair="ponytail", acc="scarf"),
         stance=pose(py=-9, lean=10, nsh=40, nel=40, fsh=20, fel=50, nhp=34, nkn=34, fhp=-26, fkn=30, nhr=6, fhr=6, head=-4),
@@ -400,7 +400,7 @@ MOVESETS = {
     M("jpunch",     "jY jX",      K["jpunch"],    6, 1, 13, 0, 0, 0, "AIR HAMMER"),
     M("jkick",      "jB jA",      K["jknee"],     11, 1, 16, 0, 0, 0, "AIR KNEE"),
   ],
-  "ROCCO": [  # Boxer / MMA striker: the jab-cross-hook-uppercut, leg kicks, superman punch
+  "JACK": [   # boxer: the jab-cross-hook-uppercut, leg kicks, superman punch
     M("jab",        "Y",          K["jab"],       6, 0,  6, 0,  3, 3, "JAB"),
     M("cross",      "X jab>X",    K["straight"],  9, 0, 13, 0, -2, 5, "CROSS"),
     M("hook",       "cross>Y",    K["hook"],      6, 0, 14, 0, -4, 3, "LEAD HOOK"),
@@ -416,7 +416,7 @@ MOVESETS = {
     M("jpunch",     "jY jX",      K["jpunch"],    6, 1, 12, 0, 0, 0, "AIR PUNCH"),
     M("jkick",      "jB jA",      K["jknee"],     11, 1, 15, 0, 0, 0, "FLYING KNEE"),
   ],
-  "NOVA": [   # Capoeira: flowing spinning kicks, sweeps and low pushes
+  "LUNA": [   # Capoeira: flowing spinning kicks, sweeps and low pushes
     M("slap",       "Y",          K["slap"],      6, 0,  6, 0,  2, 2, "GALOPANTE"),
     M("elbow",      "X slap>X",   K["elbow"],     8, 0, 13, 0, -3, 4, "COTOVELADA"),
     M("martelo",    "B slap>B",   K["martelo"],   12, 0, 15, 0, -4, 2, "MARTELO"),
@@ -548,11 +548,11 @@ FINISHERS = {
   "VALKA":  dict(title="VALHALLA FALLS", seq="D B D X", steps=INTRO +
              flurry(["hammer", "hammer2"], 9, 8) + [("anim", "backfist", 16), ("anim", "knee", 14), ("anim", "flyknee", 18),
              ("launch", 1800, 200), ("jump", 1600, 30), ("wait", 12), ("anim", "jkick", 14), ("slow", 60), ("dim", 4, 30), ("final", 300, 2700)]),
-  "ROCCO":  dict(title="KNOCKOUT KING", seq="F F F Y", steps=INTRO +
+  "JACK":   dict(title="KNOCKOUT KING", seq="F F F Y", steps=INTRO +
              flurry(["jab", "cross", "hook"], 8, 12) + [("anim", "bodyshot", 12), ("anim", "rush", 22), ("anim", "superman", 16),
              ("anim", "uppercut", 16), ("launch", 1700, 200), ("jump", 1500, 30), ("wait", 12), ("anim", "jpunch", 14),
              ("slow", 60), ("dim", 4, 30), ("final", 600, 2600)]),
-  "NOVA":   dict(title="CARNAVAL STORM", seq="B D F A", steps=INTRO +
+  "LUNA":   dict(title="CARNAVAL STORM", seq="B D F A", steps=INTRO +
              flurry(["martelo", "armada"], 13, 6) + [("anim", "meialua", 20), ("anim", "meialua", 20), ("anim", "ponteira", 16),
              ("launch", 1700, 200), ("jump", 1500, 30), ("wait", 12), ("anim", "jkick", 14), ("slow", 60), ("dim", 4, 30), ("final", 600, 2600)]),
 }
@@ -633,7 +633,7 @@ def main():
     consts = {"NJOINT": NJ, "NFIGHTER": len(ROSTER), "NBASEANIM": len(base)}
     for i, n in enumerate(base): consts["AN_" + n.upper()] = i
     legend = ["# Move lists", "", "Controls: D-pad moves; Up jumps (Up+toward / Up+away jump in / out);",
-              "Down crouches; R guards; R+Up / R+Down sidestep (hold to keep circling);",
+              "Down crouches; R guards;",
               "double-tap toward / away dashes in / backdashes.  Y punch, X power punch,",
               "B kick, A power kick, L throw.  'after Jab: X' = press X while the jab is",
               "still out to chain into the next hit of the string.", "",

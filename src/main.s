@@ -1,15 +1,14 @@
 ; =============================================================================
-;  ARENA FIGHTER (working title) - SNES, 65816 assembly (ca65)
-;  Mode 7 perspective arena + ball-jointed 3D fighters.
+;  SAVAGE DOMINION - SNES, 65816 assembly (ca65)
+;  Side-view fighter: polygon fighters drawn by the Super FX over a tiled stage.
+;  Built on Arena Fighter FX (MIT).
 ;
-;  Screen layout (per scanline, switched by HDMA):
-;    0..71   Mode 1: sky gradient (colour math), panorama (BG2), HUD (BG3), sprites
-;    72..81  fog band: backdrop only + sprites
-;    82..223 Mode 7: perspective floor (BG1), sprites, half-transparent shadows
+;  Mode 1 screen: BG1 lamps / barrier / floor, BG2 far wall and crowd, BG3 HUD,
+;  sprites for fighters and shadows.  HDMA: ch1 BG1 scroll per floor line
+;  (pseudo-perspective), ch2 colour math (translucent shadows), ch3 title band.
 ;
-;  World units: "hu" = half floor texels.  Fighter positions are relative to the
-;  arena centre (map texel 512,512).  Camera yaw a (0..255): right = (cos a, sin a),
-;  forward = (sin a, -cos a) in map coordinates (x right, y down).
+;  World units: "hu", relative to the stage centre.  Fighters stay on the z = 0
+;  plane; the camera looks straight at it and only tracks x.
 ; =============================================================================
 .p816
 .smart
@@ -17,8 +16,8 @@
 .include "fighters.inc"
 .include "regs.inc"
 
-.import m7_vram0, persp_A0, persp_A1, persp_B0, persp_B1, persp_C0, persp_C1, persp_D0, persp_D1
-.import sky_r, bg_pal, pan_tiles, pan_map, font2, bar2, obj_tiles
+.import near_tiles, near_map, far_tiles, far_map, floor_k, math_fight, math_title, tm_title
+.import bg_pal, font2, bar2, obj_tiles
 .import gsu_code, gsu_circ, sin8, cos8, recip, atan64, scale8
 .import ch0_frames, ch0_anim, ch0_balls, ch0_nballs, ch0_pal, ch0_move
 .import ch1_frames, ch1_anim, ch1_balls, ch1_nballs, ch1_pal, ch1_move
@@ -150,6 +149,16 @@ nmi:
         sta     INIDISP
         lda     #SCMR_CPU
         sta     GSU_SCMR
+        ; this frame's stage scroll (before the long DMA, safely inside vblank)
+        lda     panX
+        sta     BG2HOFS
+        lda     panX+1
+        sta     BG2HOFS
+        ldx     #.loword(scrTab)
+        lda     backSetBit+1
+        beq     :+
+        ldx     #.loword(scrTab + SCRLEN)
+:       stx     A1T1L
         lda     #$80
         sta     VMAIN
         ldx     #$6000
@@ -180,28 +189,6 @@ nmi:
         stx     DAS0L
         lda     #$01
         sta     MDMAEN
-        ; Mode 7 centre / scroll for this frame's camera
-        lda     m7x
-        sta     M7X
-        lda     m7x+1
-        sta     M7X
-        lda     m7y
-        sta     M7Y
-        lda     m7y+1
-        sta     M7Y
-        lda     m7h
-        sta     M7HOFS
-        lda     m7h+1
-        sta     M7HOFS
-        lda     m7v
-        sta     M7VOFS
-        lda     m7v+1
-        sta     M7VOFS
-        lda     panX
-        sta     BG2HOFS
-        lda     panX+1
-        sta     BG2HOFS
-        jsr     setPerspective
         lda     backSetBit+1        ; the next frame goes to the other tile set
         eor     #1
         sta     backSetBit+1
@@ -300,95 +287,6 @@ samplePads:
         rts
 
 ; -----------------------------------------------------------------------------
-; HDMA source for M7A..D: table of the current yaw (angles >= 128 live in the next bank)
-setPerspective:
-        rep     #$20
-        .a16
-        lda     pYaw
-        and     #$007F
-        sta     ntmp0
-        asl     a                   ; *217 = *256 - *32 - *4 - *2 - *1
-        asl     a
-        asl     a
-        asl     a
-        asl     a
-        sta     ntmp1                ; *32
-        lda     ntmp0
-        xba                         ; *256
-        sec
-        sbc     ntmp1
-        sbc     ntmp0
-        sbc     ntmp0
-        sbc     ntmp0
-        sbc     ntmp0
-        sbc     ntmp0
-        sbc     ntmp0
-        sbc     ntmp0                ; 256-32-7 = 217
-        sta     ntmp1                ; offset within the half-table
-        sep     #$20
-        .a8
-        lda     pYaw
-        bmi     @hi
-        rep     #$20
-        .a16
-        lda     #.loword(persp_A0)
-        clc
-        adc     ntmp1
-        sta     A1T1L
-        lda     #.loword(persp_B0)
-        clc
-        adc     ntmp1
-        sta     A1T2L
-        lda     #.loword(persp_C0)
-        clc
-        adc     ntmp1
-        sta     A1T3L
-        lda     #.loword(persp_D0)
-        clc
-        adc     ntmp1
-        sta     A1T4L
-        sep     #$20
-        .a8
-        lda     #^persp_A0
-        sta     A1B1
-        lda     #^persp_B0
-        sta     A1B2
-        lda     #^persp_C0
-        sta     A1B3
-        lda     #^persp_D0
-        sta     A1B4
-        rts
-@hi:    rep     #$20
-        .a16
-        lda     #.loword(persp_A1)
-        clc
-        adc     ntmp1
-        sta     A1T1L
-        lda     #.loword(persp_B1)
-        clc
-        adc     ntmp1
-        sta     A1T2L
-        lda     #.loword(persp_C1)
-        clc
-        adc     ntmp1
-        sta     A1T3L
-        lda     #.loword(persp_D1)
-        clc
-        adc     ntmp1
-        sta     A1T4L
-        sep     #$20
-        .a8
-        lda     #^persp_A1
-        sta     A1B1
-        lda     #^persp_B1
-        sta     A1B2
-        lda     #^persp_C1
-        sta     A1B3
-        lda     #^persp_D1
-        sta     A1B4
-        rts
-
-; -----------------------------------------------------------------------------
 initHardware:
         lda     #$80
         sta     INIDISP
@@ -436,9 +334,10 @@ clearRam:
 loadGraphics:
         lda     #$80
         sta     VMAIN               ; increment after high byte
-        VRAM_DMA m7_vram0, $0000, $8000      ; Mode 7: map (low bytes) + 8bpp tiles (high bytes), words 0-$3FFF
-        VRAM_DMA pan_tiles, $4000, PAN_TILES*32
-        VRAM_DMA pan_map, $4800, 4096
+        VRAM_DMA near_tiles, $0000, NEAR_TILES*32
+        VRAM_DMA far_tiles, $2000, FAR_TILES*32
+        VRAM_DMA near_map, $3000, 4096
+        VRAM_DMA far_map, $3800, 4096
         VRAM_DMA font2, $5000, 64*16
         VRAM_DMA bar2, $5200, 9*16
         VRAM_DMA logo2, $5000 + LOGO_T0 * 8, LOGO_NT * 16
@@ -471,8 +370,8 @@ loadGraphics:
         lda     #$00
         stz     CGDATA
         stz     CGDATA
-        ; OBJ palette 6: hit sparks (white/yellow/orange)
-        lda     #$E0
+        ; OBJ palette 3: hit sparks (white/yellow/orange)
+        lda     #$B0
         sta     CGADD
         ldx     #0
 :       lda     sparkPal,x
@@ -483,109 +382,92 @@ loadGraphics:
         ; video registers
         lda     #$09
         sta     BGMODE
-        lda     #$49                ; BG2 map $4800, 64x32
+        lda     #$31                ; BG1 map $3000, 64x32
+        sta     BG1SC
+        lda     #$39                ; BG2 map $3800, 64x32
         sta     BG2SC
         lda     #$58                ; BG3 map $5800
         sta     BG3SC
-        lda     #$40                ; BG2 tiles $4000
+        lda     #$20                ; BG1 tiles $0000, BG2 tiles $2000
         sta     BG12NBA
         lda     #$05                ; BG3 tiles $5000
         sta     BG34NBA
         lda     #$63                ; OBJ 16x16/32x32, base $6000
         sta     OBSEL
-        lda     #$C0                ; Mode 7: outside the map -> tile 0 (water)
-        sta     M7SEL
-        lda     #$02                ; colour math source: sub screen (fixed colour as its backdrop)
+        lda     #$17                ; main screen: BG1-3 + OBJ
+        sta     TM
+        lda     #$01                ; sub screen: BG1 (shows through the shadows)
+        sta     TS
+        lda     #$02                ; colour math source: sub screen
         sta     CGWSEL
-        lda     #$40|$08            ; fixed colour green component (sky)
+        lda     #$E0                ; fixed colour black
         sta     COLDATA
-        lda     #$FF                ; BG3 v-scroll: row 0 at line 1
-        sta     BG3VOFS
-        stz     BG3VOFS
-        lda     #$FF
+        lda     #$FF                ; v-scroll: row 0 at line 1
+        sta     BG1VOFS
+        stz     BG1VOFS
         sta     BG2VOFS
         stz     BG2VOFS
+        sta     BG3VOFS
+        stz     BG3VOFS
         rts
 
 sparkPal: .word $0000, $7FFF, $3BFF, $11FF
 
 ; -----------------------------------------------------------------------------
-; HDMA: ch1-4 Mode 7 matrix (perspective), ch5 BGMODE, ch6 TM/TS, ch7 CGADSUB/COLDATA (sky)
+; HDMA: ch1 BG1HOFS per line (table built by the renderer), ch2 CGADSUB + COLDATA,
+; ch3 TM (title screen only: the bottom lines become the logo band)
 setupHdma:
+        .a8
+        rep     #$20
+        .a16
+        stz     camX
+        ldx     #0
+        jsr     buildScroll
+        .a16
+        ldx     #SCRLEN
+        jsr     buildScroll
+        .a16
+        sep     #$20
+        .a8
         lda     #$02                ; mode 2: write twice
         sta     DMAP1
-        sta     DMAP2
-        sta     DMAP3
-        sta     DMAP4
-        lda     #<M7A
+        lda     #<BG1HOFS
         sta     BBAD1
-        lda     #<M7B
-        sta     BBAD2
-        lda     #<M7C
-        sta     BBAD3
-        lda     #<M7D
-        sta     BBAD4
-        stz     DMAP5               ; mode 0
-        lda     #<BGMODE
-        sta     BBAD5
-        ldx     #.loword(hdmaMode)
-        lda     scene
-        cmp     #SC_TITLE
-        bne     :+
-        ldx     #.loword(hdmaModeT)
-:       stx     A1T5L
-        lda     #^hdmaMode
-        sta     A1B5
+        ldx     #.loword(scrTab)
+        stx     A1T1L
+        lda     #$7E
+        sta     A1B1
         lda     #$01                ; mode 1: two registers
-        sta     DMAP6
-        lda     #<TM
-        sta     BBAD6
-        ldx     #.loword(hdmaLayers)
-        lda     scene
-        cmp     #SC_TITLE
-        bne     :+
-        ldx     #.loword(hdmaLayersT)
-:       stx     A1T6L
-        lda     #^hdmaLayers
-        sta     A1B6
-        lda     #$01
-        sta     DMAP7
+        sta     DMAP2
         lda     #<CGADSUB
-        sta     BBAD7
-        ldx     #.loword(sky_r)
+        sta     BBAD2
+        ldx     #.loword(math_fight)
         lda     scene
         cmp     #SC_TITLE
         bne     :+
-        ldx     #.loword(skyT)
-:       stx     A1T7L
-        lda     #^sky_r
-        sta     A1B7
+        ldx     #.loword(math_title)
+:       stx     A1T2L
+        lda     #^math_fight
+        sta     A1B2
+        stz     DMAP3               ; mode 0
+        lda     #<TM
+        sta     BBAD3
+        ldx     #.loword(tm_title)
+        stx     A1T3L
+        lda     #^tm_title
+        sta     A1B3
+        lda     panX
+        sta     BG2HOFS
+        lda     panX+1
+        sta     BG2HOFS
         lda     scene
         cmp     #SC_TITLE
-        bne     :+
-        lda     #^skyT
-        sta     A1B7
-:
-        jsr     setPerspective
-        lda     #%11111110
-        sta     HDMAEN
+        beq     :+
+        lda     #%00000110
+        bra     :++
+:       lda     #%00001110
+:       sta     HDMAEN
         rts
-
-hdmaMode:   .byte FLOOR0, $09, 1, $07, 0
-hdmaLayers: .byte HORIZON, $16, $00, FOG, $10, $00, 1, $11, $01, 0
-; home screen: the bottom 48 lines go back to Mode 1 for the logo band (BG3 + sprites)
-BAND = 176
-skyT:
-.repeat HORIZON + FOG, I
-        .byte   1, $20, $A0 | (4 + 20 * I / (HORIZON + FOG))
-.endrep
-        .byte   BAND - FLOOR0, $50, $E0
-        .byte   2, $20, $60 | 22        ; gold trim on top of the band
-        .byte   2, $20, $60 | 9
-        .byte   1, $00, $E0
-        .byte   0
-hdmaModeT:   .byte FLOOR0, $09, BAND - FLOOR0, $07, 1, $09, 0
-hdmaLayersT: .byte HORIZON, $16, $00, FOG, $10, $00, BAND - FLOOR0, $11, $01, 1, $14, $00, 0
 
 .include "math.s"
 .include "render.s"
@@ -595,7 +477,7 @@ hdmaLayersT: .byte HORIZON, $16, $00, FOG, $10, $00, BAND - FLOOR0, $11, $01, 1,
 
 ; -----------------------------------------------------------------------------
 .segment "HEADER"
-        .byte   "ARENA FIGHTER        "  ; 21 bytes
+        .byte   "SAVAGE DOMINION      "  ; 21 bytes
         .byte   $30                 ; LoROM + FastROM
         .byte   $15                 ; Super FX (GSU-2) + RAM + battery
         .byte   $0A                 ; 1 MB

@@ -24,10 +24,6 @@ camYaw: .res 2          ; 0..255 (high byte kept 0)
 camX:   .res 2          ; camera position, hu relative to arena centre
 camZ:   .res 2
 camDist: .res 2
-m7x:    .res 2
-m7y:    .res 2
-m7h:    .res 2
-m7v:    .res 2
 panX:   .res 2
 loopCount: .res 2
 frameCount: .res 2
@@ -163,13 +159,6 @@ backSetBit: .res 2
 upState: .res 1
 dl0:    .res 14 + 48 * 12
 dl1:    .res 14 + 48 * 12
-nM7x:   .res 2
-nM7y:   .res 2
-nM7h:   .res 2
-nM7v:   .res 2
-nPanX:  .res 2
-nYaw:   .res 2
-pYaw:   .res 2
 dbgBusy: .res 2
 curMinX: .res 2
 curMaxX: .res 2
@@ -184,6 +173,8 @@ bSX2:   .res 160
 bSY2:   .res 160
 bSz2:   .res 80
 dbgUp:  .res 2
+SCRLEN = 7 + 3 * FLOOR_BANDS
+scrTab: .res SCRLEN * 2 ; BG1 scroll HDMA tables (double buffered with the tiles)
 bShp:   .res 160
 fFlip:  .res 4
 shapeDirty: .res 1

@@ -206,66 +206,28 @@ animTabBk: .byte ^ch0_anim, 0
            .word .loword(ch5_anim)
            .byte ^ch5_anim, 0
 
-; camera: yaw eases toward fighter 0's facing (so P1 is on the left), position =
-; midpoint - forward * distance
+; camera: side on, tracking the midpoint between the fighters, stopping near the walls
 cameraFollow:
         .a8
-        lda     lineAng
-        clc
-        adc     camOrbit                ; finishers swing the camera around
-        sec
-        sbc     camYaw
-        beq     @pos
-        bmi     @dec
-        inc     camYaw
-        cmp     #8
-        bcc     @pos
-        inc     camYaw
-        bra     @pos
-@dec:   dec     camYaw
-        cmp     #$F8
-        bcs     @pos
-        dec     camYaw
-@pos:   ; distance grows with separation
         rep     #$20
         .a16
+        stz     camYaw
+        lda     camDist
+        sta     camZ
         lda     fX
         clc
         adc     fX+2
         cmp     #$8000
-        ror     a
-        sta     tmp0                ; mid x
-        lda     fZ
-        clc
-        adc     fZ+2
-        cmp     #$8000
-        ror     a
-        sta     tmp1                ; mid z
-        ; camX = midx - sin(a)*dist >> 7 ; camZ = midz + cos(a)*dist >> 7
-        lda     camDist
-        sta     mBw
-        sep     #$20
-        .a8
-        ldx     camYaw
-        lda     sin8,x
-        sta     mB
-        jsr     smul16x8
-        .a16
-        sta     tmp2
-        lda     tmp0
-        sec
-        sbc     tmp2
-        sta     camX
-        sep     #$20
-        .a8
-        ldx     camYaw
-        lda     cos8,x
-        sta     mB
-        jsr     smul16x8
-        .a16
-        clc
-        adc     tmp1
-        sta     camZ
+        ror     a                   ; mid x
+        bmi     @neg
+        cmp     #CAMX_MAX
+        bcc     @st
+        lda     #CAMX_MAX
+        bra     @st
+@neg:   cmp     #.loword(-CAMX_MAX)
+        bcs     @st
+        lda     #.loword(-CAMX_MAX)
+@st:    sta     camX
         sep     #$20
         .a8
         rts

@@ -6,6 +6,16 @@ used under the MIT License. Concept and direction by Xenocide21; developed with 
 
 The text below this line describes the Arena Fighter FX base and will be replaced as the game changes.
 
+## First milestone (side view)
+
+- Side-on 2D fighting plane over a tiled stage, **The Pit** (stage art: `tools/stage_pit.py`).
+  There is no sidestep and no ring out: both ends of the stage are walls.
+- **Jack** and **Luna** are rough stand-ins (recoloured, reusing earlier models and moves).
+  Their real models and the rest of the roster are still to be made.
+- Controllers are sampled every video frame, so quick taps register at any frame rate.
+- Renderer speed work: see the commit history. The title logo and menu art are still the
+  old ones.
+
 ---
 
 # ARENA FIGHTER FX

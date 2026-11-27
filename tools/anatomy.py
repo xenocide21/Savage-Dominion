@@ -118,9 +118,9 @@ PHYSIQUE = {
     "BRUTUS": body(MALE, chest=1.30, waist=1.38, belly=2.4, hips=1.28, glute=1.18, arms=1.40, fore=1.32, legs=1.30,
                    calf=1.30, neck=1.45, fist=1.22, foot=1.22, headk=0.90),
     # lean boxer: built-up shoulders and arms, lighter legs
-    "ROCCO": body(MALE, chest=1.04, waist=0.96, arms=1.10, fore=1.04, legs=0.94, calf=0.94, glute=0.92, headk=0.88),
+    "JACK": body(MALE, chest=1.04, waist=0.96, arms=1.10, fore=1.04, legs=0.94, calf=0.94, glute=0.92, headk=0.88),
     # capoeirista: long powerful legs and glutes, slim upper body
-    "NOVA": body(FEMALE, chest=0.90, waist=0.92, hips=0.96, glute=1.04, bust=0.90, arms=0.88, legs=0.94, calf=0.92,
+    "LUNA": body(FEMALE, chest=0.90, waist=0.92, hips=0.96, glute=1.04, bust=0.90, arms=0.88, legs=0.94, calf=0.92,
                  fist=0.94, foot=0.88, headk=0.90),
 }
 

@@ -48,59 +48,106 @@ render:
         bne     :-
         rep     #$20
         .a16
-        lda     nM7x
-        sta     m7x
-        lda     nM7y
-        sta     m7y
-        lda     nM7h
-        sta     m7h
-        lda     nM7v
-        sta     m7v
-        lda     nPanX
-        sta     panX
-        lda     nYaw
-        sta     pYaw
+        ldx     #0                  ; the scroll table goes in the buffer not on screen
+        lda     backSetBit
+        and     #$FF00
+        beq     :+
+        ldx     #SCRLEN
+:       jsr     buildScroll
+        .a16
         sep     #$20
         .a8
         jsr     buildOAM
         jmp     gsuKick
 
 ; ---------------------------------------------------------------- camera
-; Mode 7: centre = camera map position; HOFS/VOFS so screen (128, HORIZON) is the centre.
 cameraRegs:
-        rep     #$20
-        .a16
-        lda     camX
-        cmp     #$8000
-        ror     a                   ; hu -> texels (signed)
-        clc
-        adc     #ARENA_CX
-        sta     nM7x
-        sec
-        sbc     #128
-        and     #$1FFF
-        sta     nM7h
-        lda     camZ
-        cmp     #$8000
-        ror     a
-        clc
-        adc     #ARENA_CY
-        sta     nM7y
-        sec
-        sbc     #HORIZON
-        and     #$1FFF
-        sta     nM7v
-        lda     camYaw              ; panorama: 2 px per yaw step
-        sta     nYaw
-        asl     a
-        sta     nPanX
-        sep     #$20
         .a8
         ldx     camYaw
         lda     f:cos8,x
         sta     cA
         lda     f:sin8,x
         sta     sA
+        rts
+
+; X = 0 / SCRLEN: build the BG1 per-line scroll table for the current camera and set
+; panX (BG2).  The layers move with the camera in proportion to their depth.
+buildScroll:
+        .a16
+        phx
+        sep     #$20
+        .a8
+        lda     #STAGE_SC
+        sta     sc
+        rep     #$20
+        .a16
+        lda     camX
+        jsr     mulSc               ; camera travel in screen pixels at the fighting plane
+        .a16
+        sta     tmp6
+        cmp     #$8000              ; far wall: a quarter of that
+        ror     a
+        cmp     #$8000
+        ror     a
+        clc
+        adc     #128
+        sta     panX
+        asl     tmp6                ; twice, since the factors are in 1/128ths
+        sep     #$20
+        .a8
+        lda     f:floor_k
+        sta     sc
+        rep     #$20
+        .a16
+        lda     tmp6
+        jsr     mulSc               ; everything above the floor moves like its far edge
+        .a16
+        clc
+        adc     #128
+        ply                         ; Y = table offset (mulSc uses X)
+        sta     scrTab+1,y
+        sta     scrTab+4,y
+        sep     #$20
+        .a8
+        lda     #127
+        sta     scrTab,y
+        lda     #FLOORTOP - 127
+        sta     scrTab+3,y
+        rep     #$20
+        .a16
+        stz     tmp7                ; floor band
+@band:  ldx     tmp7
+        sep     #$20
+        .a8
+        lda     f:floor_k,x
+        sta     sc
+        rep     #$20
+        .a16
+        lda     tmp6
+        jsr     mulSc
+        .a16
+        clc
+        adc     #128
+        sta     scrTab+7,y
+        sep     #$20
+        .a8
+        lda     #2
+        sta     scrTab+6,y
+        rep     #$20
+        .a16
+        iny
+        iny
+        iny
+        inc     tmp7
+        lda     tmp7
+        cmp     #FLOOR_BANDS
+        bne     @band
+        sep     #$20
+        .a8
+        lda     #0
+        sta     scrTab+6,y
+        rep     #$20
+        .a16
         rts
 
 ; ---------------------------------------------------------------- joints
@@ -988,7 +1035,7 @@ buildOAM:
         bcs     :+
         ldy     #SPARK_TILE2
 :       tya
-        ora     #(6 << 9) | $3000
+        ora     #(3 << 9) | $3000         ; palette 3: opaque (no colour math)
         sta     tmp2
         ldy     sparkJ
         lda     jSX,y

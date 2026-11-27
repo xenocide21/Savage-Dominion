@@ -2,9 +2,8 @@
 """Asset generator for the SNES arena fighter.
 
 Produces ../build/assets.s (+ .bin blobs) with:
-  * Mode 7 arena floor: 128x128 tile map + up to 256 8bpp tiles, palette entries 64..127
-  * perspective HDMA tables for 256 camera yaw angles (M7A/M7B/M7C/M7D per floor line)
-  * sky gradient (COLDATA HDMA), distant panorama (BG2, mode 1) + palette
+  * the side-view stage (stage_pit.py): BG1 / BG2 tiles, maps, palettes, floor scroll factors
+  * colour-math HDMA tables (translucent floor shadows, title band)
   * shaded ball sprites (OBJ tiles) in 15 sizes x 2 material halves
   * 2bpp font for the HUD (BG3)
   * sin/cos and reciprocal tables for the 3D projection
@@ -20,12 +19,17 @@ os.makedirs(OUT, exist_ok=True)
 os.makedirs(PREV, exist_ok=True)
 
 # ------------------------------------------------------------------ camera / projection constants
-HORIZON = 72          # screen line of the horizon
-FOG = 10              # lines below the horizon left blank (matrix values would overflow there)
+# Side view: the camera looks straight at the fighting plane from CAMDIST away.
+HORIZON = 124         # screen line of the horizon
 FOCAL = 256           # focal length in pixels
 CAMH = 40             # camera height above the floor, world units (= floor texels)
-FLOOR0 = HORIZON + FOG
-NANG = 256            # camera yaw steps
+CAMDIST = 330         # hu from the camera to the fighting plane
+STAGE_SC = 201        # screen pixels per 256 hu at the fighting plane (scale8 at CAMDIST)
+FEET_Y = HORIZON + ((CAMH * 2 * STAGE_SC) >> 8)   # where standing feet meet the floor
+FLOORTOP = 152        # screen line of the floor's far edge (a tile boundary)
+STAGE_HALF = 300      # walls, hu either side of the stage centre
+CAMX_MAX = 160        # the camera stops this far from the centre
+MAXSEP = 250          # fighters can't separate further than the screen shows
 
 def c5(r, g, b):
     """8-bit-per-channel rgb -> SNES BGR555 word"""
@@ -37,156 +41,10 @@ consts = {}
 def blob(label, data, seg=None):
     blobs.append((label, bytes(data), seg))
 
-# ------------------------------------------------------------------ Mode 7 arena floor
-MAPW = 1024
-CX = CY = 512
-ARENA = 168           # half-width of the octagonal ring (world units)
-consts.update(ARENA_CX=CX, ARENA_CY=CY, ARENA_R=ARENA)
+consts.update(HORIZON=HORIZON, FOCAL=FOCAL, CAMH=CAMH, CAMDIST=CAMDIST, STAGE_SC=STAGE_SC, FEET_Y=FEET_Y,
+              FLOORTOP=FLOORTOP, STAGE_HALF=STAGE_HALF, CAMX_MAX=CAMX_MAX, MAXSEP=MAXSEP)
 
-floor_pal = [
-    (24, 40, 72), (30, 52, 92), (40, 66, 112), (60, 96, 140), (110, 150, 190),       # water 0-4
-    (70, 64, 60), (92, 86, 78), (116, 108, 98), (140, 132, 120), (168, 160, 146),   # stone 5-9
-    (52, 46, 42), (196, 188, 170),                                                  # grout 10, edge light 11
-    (150, 110, 60), (190, 150, 80), (230, 196, 110),                                # gold inlay 12-14
-    (40, 34, 32),                                                                   # deep edge 15
-]
-
-def in_oct(x, y, r):
-    """octagon whose diagonal edges run through tile corners (keeps the tile count low)"""
-    dx, dy = abs(x - CX), abs(y - CY)
-    return dx <= r and dy <= r and dx + dy <= r + 64
-
-floor = Image.new("P", (MAPW, MAPW), 0)
-fp = floor.load()
-for y in range(MAPW):
-    for x in range(MAPW):
-        tx, ty = x % 8, y % 8
-        if in_oct(x + 0.5, y + 0.5, ARENA):
-            if not in_oct(x + 0.5, y + 0.5, ARENA - 8):
-                c = 11 if not in_oct(x + 0.5, y + 0.5, ARENA - 3) else 9      # bright rim
-            else:
-                sx, sy = (x - CX + 2048) // 32, (y - CY + 2048) // 32
-                tone = (sx + sy * 2) % 3
-                if (x - CX) % 32 == 0 or (y - CY) % 32 == 0:
-                    c = 10
-                else:
-                    c = 6 + tone
-                    if ((tx * 3 + ty * 5) % 11) == 0: c = 5 + tone
-                d = math.hypot(x + 0.5 - CX, y + 0.5 - CY)
-                if 44 <= d < 48 or 84 <= d < 87:
-                    c = 13 if (int(d) % 4) else 14
-                if d < 6:
-                    c = 14
-            fp[x, y] = c
-        else:
-            if in_oct(x + 0.5, y + 0.5, ARENA + 8):
-                fp[x, y] = 15
-            else:
-                fp[x, y] = 1 + ((x // 4 + y // 4) % 4 > 1) + ((x // 8 + y // 8) % 2)
-# tile-ize (deduplicate) -> must fit 256 tiles
-tiles, tmap, index = [], [], {}
-for ty in range(128):
-    for tx in range(128):
-        t = floor.crop((tx * 8, ty * 8, tx * 8 + 8, ty * 8 + 8)).tobytes()
-        if t not in index:
-            index[t] = len(tiles)
-            tiles.append(t)
-        tmap.append(index[t])
-assert len(tiles) <= 256, "mode 7 floor uses %d tiles" % len(tiles)
-# VRAM interleave: low byte = map, high byte = tile pixels (64 colours offset by 64)
-m7 = bytearray(0x8000)      # 16K VRAM words: low byte map, high byte tile pixels
-for i, t in enumerate(tmap):
-    m7[i * 2] = t
-for ti, t in enumerate(tiles):
-    for p in range(64):
-        m7[(ti * 64 + p) * 2 + 1] = (t[p] + 64) if True else 0
-blob("m7_vram0", m7, 2)
-floorpal = [c5(*c) for c in floor_pal]
-consts["FLOOR_TILES"] = len(tiles)
-prev = Image.new("RGB", (MAPW // 2, MAPW // 2))
-pp = prev.load()
-for y in range(0, MAPW, 2):
-    for x in range(0, MAPW, 2):
-        pp[x // 2, y // 2] = floor_pal[fp[x, y]]
-prev.save(os.path.join(PREV, "floor.png"))
-
-# ------------------------------------------------------------------ perspective HDMA tables
-# floor line y (>= FLOOR0): distance f = CAMH*FOCAL/(y-HORIZON)
-#   lateral scale s = CAMH/(y-h), forward step t = CAMH*FOCAL/(y-h)^2
-#   A = s*cos, B = t*sin, C = s*sin, D = -t*cos   (8.8 fixed)
-# tables: one entry per 2 lines (repeat), HDMA mode 2 (write twice), 4 registers per angle
-def fx88(v):
-    v = int(round(v * 256))
-    v = max(-32768, min(32767, v))
-    return v & 0xFFFF
-
-lines = list(range(FLOOR0, 224, 2))
-consts["PERSP_ENTRIES"] = len(lines)
-tabA, tabB, tabC, tabD = bytearray(), bytearray(), bytearray(), bytearray()
-for a in range(NANG):
-    ang = a * 2 * math.pi / NANG
-    ca, sa = math.cos(ang), math.sin(ang)
-    for tab, fn in ((tabA, lambda s, t: s * ca), (tabB, lambda s, t: t * sa),
-                    (tabC, lambda s, t: s * sa), (tabD, lambda s, t: -t * ca)):
-        tab += bytes([FLOOR0 & 0x7F, 0, 0])                  # lines above the floor: don't care
-        for y in lines:
-            k = y - HORIZON + 0.5
-            s, t = CAMH / k, CAMH * FOCAL / (k * k)
-            v = fx88(fn(s, t))
-            tab += bytes([2, v & 0xFF, v >> 8])
-        tab += bytes([0])
-consts["PERSP_TAB_SIZE"] = len(tabA) // NANG
-# each register's 256 tables live in their own bank region (size per angle * 256)
-HALF = 128 * (len(tabA) // NANG)
-for i, (nm, tab) in enumerate((("A", tabA), ("B", tabB), ("C", tabC), ("D", tabD))):
-    blob("persp_%s0" % nm, tab[:HALF], 4 + i * 2)          # angles 0..127
-    blob("persp_%s1" % nm, tab[HALF:], 5 + i * 2)          # angles 128..255
-
-# ------------------------------------------------------------------ sky gradient + panorama (BG2) + HUD font (BG3)
-# COLDATA HDMA (one channel, 1 byte per line, 3 writes via separate R/G/B? -> use the
-# combined format: bit7 B, bit6 G, bit5 R + 5-bit value).  Gradient: dusk purple -> orange.
-sky = bytearray()
-for y in range(HORIZON + FOG + 1):
-    k = y / (HORIZON + FOG)
-    r = int(4 + 22 * k); g = int(2 + 12 * k); b = int(14 - 6 * k)
-    sky += bytes([1, 0x20 | min(31, r)])
-    sky += bytes([0, 0x40 | min(31, g)])  # same line: chained writes handled by 3 channels
-# HDMA ch7 writes CGADSUB + COLDATA per line (mode 1).  Sky: add a fixed colour to the
-# backdrop (R+B channels together; G fixed at init).  Floor: half-add OBJ palettes 4-7 with the
-# sub screen (BG1) -> translucent shadows.
-sky_r = bytearray()
-for y in range(HORIZON + FOG):
-    k = y / (HORIZON + FOG)
-    sky_r += bytes([1, 0x20, 0xA0 | int(4 + 20 * k)])
-sky_r += bytes([1, 0x50, 0xE0])
-sky_r += bytes([0])
-sky_g = sky_b = b"\0"
-blob("sky_r", sky_r)
-
-# panorama: 512 x 40 px silhouette band (mountains + temple columns), 4bpp, palette 1
-PW, PH = 512, 48
-pan = Image.new("P", (PW, PH), 0)
-pp = pan.load()
-rr = random.Random(11)
-hts = []
-h = 26.0
-for x in range(PW):
-    h += rr.uniform(-1.2, 1.2) + (28 - h) * 0.02
-    hts.append(h)
-for x in range(PW):
-    far = int(PH - hts[x])
-    near = int(PH - (hts[(x * 3) % PW] * 0.45 + 6 + 5 * math.sin(x / 23.0)))
-    for y in range(PH):
-        if y >= near: pp[x, y] = 3
-        elif y >= far: pp[x, y] = 2 if (x + y) % 5 else 1
-    # temple columns every 128 px
-    if x % 128 in range(60, 68) or x % 128 in range(76, 84):
-        for y in range(PH - 30, PH): pp[x, y] = 4 if (x % 128) % 8 in (0, 7) else 5
-    if x % 128 in range(56, 88):
-        for y in range(PH - 33, PH - 30): pp[x, y] = 5
-pan_pal = [0, c5(70, 50, 110), c5(56, 40, 92), c5(34, 26, 60), c5(120, 96, 120), c5(160, 128, 140)]
-pan_pal += [0] * (16 - len(pan_pal))
-
+# ------------------------------------------------------------------ 4bpp tile helper
 def tiles4(img, w, h):
     """img -> list of 4bpp planar 8x8 tiles (row-major), map entries"""
     out, idx, mp = [], {}, []
@@ -206,19 +64,50 @@ def tiles4(img, w, h):
             mp.append(idx[k])
     return out, mp
 
-pt, pm = tiles4(pan, PW, PH)
-consts["PAN_TILES"] = len(pt)
-blob("pan_tiles", b"".join(pt), 13)
-# BG2 map 64x32: panorama rows placed at tile rows 3..8 (so it sits just above the horizon)
-bg2 = bytearray(64 * 32 * 2)
-ROW0 = HORIZON // 8 - PH // 8          # bottom of the band touches the horizon
-for ty in range(PH // 8):
-    for tx in range(64):
-        t = pm[ty * 64 + tx]
-        e = t | (1 << 10)                    # palette 1
-        pos = ((ty + ROW0) * 32 + (tx % 32)) + (0 if tx < 32 else 32 * 32)
-        bg2[pos * 2] = e & 0xFF; bg2[pos * 2 + 1] = e >> 8
-blob("pan_map", bg2, 13)
+# ------------------------------------------------------------------ stage 1: THE PIT (underground fight club)
+# BG2 = far brick wall and crowd (slow parallax); BG1 = lamps, cage barrier and the
+# concrete floor.  Both maps are 512 x 256 and repeat every 128 px (BG1) / 256 px (BG2).
+# The floor's pseudo-perspective comes from a per-line BG1 scroll table (HDMA).
+import stage_pit
+far_img, far_pal, near_img, near_pal, floor_pal = stage_pit.draw(512, 256, FLOORTOP, FEET_Y)
+
+def stage_layer(img, name, pal_of_row, limit):
+    t, m = tiles4(img, 512, 256)
+    blank = bytes(32)
+    if t[0] != blank:                       # tile 0 stays empty (transparent)
+        t = [blank] + t
+        m = [i + 1 for i in m]
+    assert len(t) <= limit, "%s uses %d tiles (limit %d)" % (name, len(t), limit)
+    mp = bytearray(64 * 32 * 2)
+    for ty in range(32):
+        for tx in range(64):
+            e = m[ty * 64 + tx] | (pal_of_row(ty) << 10)
+            pos = (ty * 32 + (tx % 32)) + (0 if tx < 32 else 32 * 32)
+            mp[pos * 2] = e & 0xFF; mp[pos * 2 + 1] = e >> 8
+    consts[name.upper() + "_TILES"] = len(t)
+    blob(name + "_tiles", b"".join(t), 2 if name == "near" else 13)
+    blob(name + "_map", mp, 4)
+    return len(t)
+
+n_near = stage_layer(near_img, "near", lambda ty: 4 if ty * 8 >= FLOORTOP else 3, 512)
+n_far = stage_layer(far_img, "far", lambda ty: 2, 256)
+
+# per 2-line floor band: horizontal scroll factor * 128 (1.0 at the feet line)
+bands = list(range(FLOORTOP, 224, 2))
+floor_k = [max(1, min(255, int(round(128 * (y + 1 - HORIZON) / (FEET_Y - HORIZON))))) for y in bands]
+blob("floor_k", bytes(floor_k))
+consts["FLOOR_BANDS"] = len(bands)
+# CGADSUB + COLDATA (HDMA mode 1): translucent shadows only on the floor lines
+def runs(n, a, b):
+    out = bytearray()
+    while n > 0:
+        k = min(127, n); out += bytes([k, a, b]); n -= k
+    return out
+blob("math_fight", runs(FLOORTOP, 0x00, 0xE0) + runs(1, 0x50, 0xE0) + b"\0")
+BAND = 176
+blob("math_title", runs(FLOORTOP, 0x00, 0xE0) + runs(BAND - FLOORTOP, 0x50, 0xE0) +
+     runs(2, 0x20, 0x60 | 22) + runs(2, 0x20, 0x60 | 9) + runs(1, 0x00, 0xE0) + b"\0")
+blob("tm_title", bytes([127, 0x17, BAND - 127, 0x17, 1, 0x14, 0]))
 
 # 2bpp font (5x7 in 8x8), ASCII 32..95, palette 0 entries 1..3 (fill, shadow, highlight)
 FONT = {}
@@ -292,8 +181,8 @@ bgpal[1] = c5(250, 246, 230); bgpal[2] = c5(20, 16, 30); bgpal[3] = c5(255, 214,
 bgpal[5] = c5(250, 90, 70); bgpal[6] = c5(20, 16, 30); bgpal[7] = c5(255, 170, 120)   # BG3 pal1: P1 bar
 bgpal[9] = c5(90, 170, 250); bgpal[10] = c5(20, 16, 30); bgpal[11] = c5(170, 220, 255) # BG3 pal2: P2 bar
 bgpal[13] = c5(255, 196, 40); bgpal[14] = c5(20, 16, 30); bgpal[15] = c5(255, 250, 190) # BG3 pal3: logo
-for i in range(16): bgpal[16 + i] = pan_pal[i]
-for i, c in enumerate(floorpal): bgpal[64 + i] = c
+for base, pal in ((32, far_pal), (48, near_pal), (64, floor_pal)):
+    for i, c in enumerate(pal): bgpal[base + i] = c5(*c)
 blob("bg_pal", b"".join(bytes([c & 0xFF, c >> 8]) for c in bgpal))
 
 # ------------------------------------------------------------------ ball sprites
@@ -371,8 +260,8 @@ for f in range(3):
             dx, dy = x + 0.5 - 8, y + 0.5 - 8
             d = math.hypot(dx, dy)
             ang = math.atan2(dy, dx)
-            spike = rad * (1.0 + 0.9 * abs(math.cos(ang * 4)))
-            if d < spike: p[x, y] = 3 if d < rad * 0.5 else (2 if d < rad else 1)
+            spike = rad * (0.6 + 1.0 * abs(math.cos(ang * 2)) ** 6)
+            if d < min(spike, 7.8): p[x, y] = 3 if d < rad * 0.5 else (2 if d < rad else 1)
     place(16, obj_tiles(im), ("SP", f, 0))
 objvram = bytearray()
 for gy in range(32):
@@ -427,7 +316,6 @@ for dy in range(-32, 32):
 blob("atan64", at, 1)
 
 # ------------------------------------------------------------------ emit
-consts.update(HORIZON=HORIZON, FOG=FOG, FLOOR0=FLOOR0, FOCAL=FOCAL, CAMH=CAMH)
 with open(os.path.join(OUT, "consts.inc"), "w") as f:
     for k, v in consts.items():
         f.write("%s = %d\n" % (k, v))
@@ -439,5 +327,5 @@ with open(os.path.join(OUT, "assets.s"), "w") as f:
         open(os.path.join(OUT, fn), "wb").write(data)
         f.write('.segment "%s"\n.export %s\n%s: .incbin "%s"\n' %
                 ("BANK%d" % seg if seg is not None else "RODATA", label, label, fn))
-print("floor tiles %d, pan tiles %d, persp entries %d (%d bytes/angle), OBJ tiles used %d" %
-      (len(tiles), len(pt), len(lines), consts["PERSP_TAB_SIZE"], sum(1 for r in grid for c in r if c)))
+print("stage tiles: near %d, far %d; OBJ tiles used %d" %
+      (n_near, n_far, sum(1 for r in grid for c in r if c)))
