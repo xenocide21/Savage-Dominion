@@ -28,8 +28,8 @@ STAGE_SC = 201        # screen pixels per 256 hu at the fighting plane (scale8 a
 FEET_Y = HORIZON + ((CAMH * 2 * STAGE_SC) >> 8)   # where standing feet meet the floor
 FLOORTOP = 152        # screen line of the floor's far edge (a tile boundary)
 STAGE_HALF = 300      # walls, hu either side of the stage centre
-CAMX_MAX = 160        # the camera stops this far from the centre
-MAXSEP = 250          # fighters can't separate further than the screen shows
+CAMX_MAX = 200        # the camera stops this far from the centre
+MAXSEP = 220          # fighters can't separate further than the screen shows
 
 def c5(r, g, b):
     """8-bit-per-channel rgb -> SNES BGR555 word"""

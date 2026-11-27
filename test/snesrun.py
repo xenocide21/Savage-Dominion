@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Headless snes9x (libretro) runner: input scripts, screenshots, RAM pokes and
 frame-rate stats.  Env: SNES9X_CORE (path to snes9x_libretro.so), WATCH="sym ..."
-(print those variables at the end), SNES9X_LEGACY_GSU=1 (old, optimistic Super FX
+(print those variables at the end),
+PROBE=<n> (also print them every n frames), SNES9X_LEGACY_GSU=1 (old, optimistic Super FX
 timing; needs the patched core), FXDBG=<frame> (Super FX busy time from that frame).
 The game samples the pad every video frame, so one-frame taps register.
 usage: snesrun.py rom.sfc script.txt outprefix frames
@@ -77,6 +78,14 @@ def save(f):
     data, w, h, pitch = frame[0]
     img = Image.frombuffer("RGB", (w, h), data, "raw", "BGR;16", pitch, 1)   # RGB565
     img.save("%s_%d.png" % (prefix, f))
+PROBE = int(os.environ.get("PROBE", "0"))   # print WATCH variables every PROBE frames
+syms = {}
+dbg = os.path.join(os.path.dirname(os.path.abspath(rom)), "build", "game.dbg")
+if os.path.exists(dbg):
+    import re
+    for l in open(dbg):
+        m = re.search(r'^sym.*name="([^"]+)".*val=0x([0-9A-Fa-f]+)', l)
+        if m: syms[m.group(1)] = int(m.group(2), 16) & 0x1FFFF
 FXDBG = os.environ.get("FXDBG")           # "frame": dump the Super FX PC histogram from that frame on
 for f in range(nframes):
     if FXDBG and f == int(FXDBG) and hasattr(lib, "fxdbg_clear"): lib.fxdbg_clear()
@@ -87,16 +96,13 @@ for f in range(nframes):
         if pf == f: ram[a & 0x1FFFF] = v & 0xFF
     lib.retro_run()
     if f in shots: save(f)
+    if PROBE and f % PROBE == 0 and syms:
+        print("frame %d" % f, {k: ram[syms[k]] | ram[syms[k] + 1] << 8 for k in os.environ.get("WATCH", "loopCount").split()})
 print("ran", nframes, "frames; button reads", nhits[0])
 
 # frame-rate stats from the build's debug symbols (dbgUp = tile uploads, dbgBusy = NMIs with the GSU still drawing)
 dbg = os.path.join(os.path.dirname(os.path.abspath(rom)), "build", "game.dbg")
-if os.path.exists(dbg):
-    import re
-    syms = {}
-    for l in open(dbg):
-        m = re.search(r'^sym.*name="([^"]+)".*val=0x([0-9A-Fa-f]+)', l)
-        if m: syms[m.group(1)] = int(m.group(2), 16) & 0x1FFFF
+if syms:
     names = ["dbgUp", "dbgBusy", "loopCount"] + os.environ.get("WATCH", "").split()
     vals = {k: ram[syms[k]] | ram[syms[k] + 1] << 8 for k in names if k in syms}
     print("stats", vals)

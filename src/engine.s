@@ -3,7 +3,7 @@
 ; Conventions: routines are entered with A 8-bit (like the rest of the code) unless
 ; marked .a16; X = fighter slot (0 / 2) for per-fighter routines.
 ; Virtual input (fVin): PAD_RIGHT = forward (toward opponent), PAD_LEFT = back,
-; PAD_UP = jump, PAD_DOWN = crouch, R = guard, 
+; PAD_UP = jump, PAD_DOWN = crouch, R = guard,
 ; double-tap forward / back = dash / backdash.
 ; =============================================================================
 .macro MA16
@@ -493,7 +493,7 @@ stNeutral:
         jsr     tryAttack
         bcc     :+
         rts
-        ; Up: jump (with the forward / back held as drift)
+:       ; Up: jump (with the forward / back held as drift)
         lda     fVinP,x
         and     #PAD_UP
         beq     :+
@@ -1330,7 +1330,14 @@ fopFinal:
         sta     finPhase
         stz     fState,x
         lda     #AN_IDLE
-        jsr     setAnim
+        ldy     fAir,x
+        beq     :+
+        lda     #1                      ; finished in mid-air: fall back to the floor
+        sta     fAirAtk,x
+        lda     #ST_JUMP
+        sta     fState,x
+        lda     #AN_JUMP
+:       jsr     setAnim
         lda     #SFX_HITHV
         jmp     playSfx
 

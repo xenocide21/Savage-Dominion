@@ -486,6 +486,23 @@ def expand(ch, keys, loop=False):
         prev = tgt
     return frames
 
+def ground(ch, p, J, lag):
+    """keep a pose on top of the floor (the level of the standing feet).  Lying on
+    the back, legs that hang through it swing up at the hip first, so the body
+    still rests flat; anything left below the floor lifts the whole pose."""
+    floor = min(j[1] for j in fk(ch, ch["stance"]))
+    if p["lean"] < -45:
+        p = dict(p)
+        body = min(J[i][1] for i in range(10))          # pelvis, torso, head, arms
+        rest = max(0, floor - body)
+        for hip, knee in (("nhp", 11), ("fhp", 14)):
+            for _ in range(60):
+                if min(J[knee][1], J[knee + 1][1]) + rest >= floor: break
+                p[hip] += 2
+                J = fk(ch, p, lag)
+    low = min(j[1] for j in J) - floor
+    return [(j[0], j[1] - low, j[2]) for j in J] if low < 0 else J
+
 def bake(ch, poses):
     """poses -> joints per frame, with a simple trailing lag for hair / scarves"""
     out = []
@@ -493,6 +510,8 @@ def bake(ch, poses):
     prevhead = None
     for p in poses:
         J = fk(ch, p, lag)
+        # side view: nothing may sink through the floor
+        J = ground(ch, p, J, lag)
         if prevhead is not None:
             vel = (J[3][0] - prevhead[0], J[3][1] - prevhead[1], J[3][2] - prevhead[2])
             lag = v_add(v_mul(lag, 0.6), v_mul(vel, -1.2))
