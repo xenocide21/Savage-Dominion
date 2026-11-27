@@ -75,21 +75,20 @@ reset:
         lda     #$0F
         sta     INIDISP
 mainLoop:
-        lda     nmiFlag             ; a vblank already passed while rendering? go on
-        cmp     lastNmi
-        bne     :+
-        jsr     waitFrame
-:
-        ; fixed 60 Hz game logic: run one tick per elapsed video frame (max 4)
-        lda     nmiFlag
+        ; fixed 60 Hz game logic: the NMI queues one controller sample per video frame
+        ; and each tick consumes one, so a tap shorter than a rendered frame still counts
+:       lda     padHead
         sec
-        sbc     lastNmi
-        cmp     #5
+        sbc     padTail
+        beq     :-                  ; nothing new yet
+        cmp     #PADQ_MAX + 1
         bcc     :+
-        lda     #4
+        lda     padHead             ; far behind (a long load): drop the oldest samples
+        sec
+        sbc     #PADQ_MAX
+        sta     padTail
+        lda     #PADQ_MAX
 :       sta     tickN
-        lda     nmiFlag
-        sta     lastNmi
 @tick:  jsr     readPads
         jsr     gameTick
         dec     tickN
@@ -255,6 +254,10 @@ nmi:
         sbc     dimLvl
         sta     INIDISP
 @done:
+        rep     #$10
+        sep     #$20
+        .a8
+        jsr     samplePads
         inc     nmiFlag
         rep     #$30
         pld
@@ -266,6 +269,35 @@ nmi:
 
 irq:
         rti
+
+; push this frame's controller state into the queue (called at the end of every NMI)
+samplePads:
+        .a8
+@early: lda     STAT78              ; (resets the counter read order)
+        lda     SLHV                ; latch the beam position
+        lda     OPVCT
+        sec
+        sbc     #225
+        cmp     #3
+        bcc     @early              ; lines 225..227: auto-read may not have run yet
+@busy:  lda     HVBJOY
+        and     #$01
+        bne     @busy
+        rep     #$20
+        .a16
+        lda     padHead
+        and     #PADQ_LEN - 1
+        asl     a
+        asl     a
+        tax
+        lda     JOY1L
+        sta     padQ,x
+        lda     JOY2L
+        sta     padQ+2,x
+        inc     padHead
+        sep     #$20
+        .a8
+        rts
 
 ; -----------------------------------------------------------------------------
 ; HDMA source for M7A..D: table of the current yaw (angles >= 128 live in the next bank)

@@ -129,7 +129,9 @@ rng:    .res 2
 hitStop: .res 2
 sparkJ: .res 2
 sparkT: .res 2
-lastNmi: .res 2
+padHead: .res 2         ; controller queue: written by the NMI, read by the main loop
+padTail: .res 2
+padQ:   .res PADQ_LEN * 4
 lineAng: .res 2
 dist:   .res 2
 hudChg: .res 2

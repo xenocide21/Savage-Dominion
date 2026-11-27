@@ -3,7 +3,7 @@
 frame-rate stats.  Env: SNES9X_CORE (path to snes9x_libretro.so), WATCH="sym ..."
 (print those variables at the end), SNES9X_LEGACY_GSU=1 (old, optimistic Super FX
 timing; needs the patched core), FXDBG=<frame> (Super FX busy time from that frame).
-Hold buttons for 8+ frames: the game reads the pad once per main-loop pass.
+The game samples the pad every video frame, so one-frame taps register.
 usage: snesrun.py rom.sfc script.txt outprefix frames
 script lines:  "<f0> <f1> <buttons>"  hold buttons (P1) for frames f0..f1
                "<f0> <f1> 2:<buttons>" same for P2

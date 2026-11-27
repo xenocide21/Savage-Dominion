@@ -51,8 +51,8 @@ dispOff:
 dispOn:
         .a16
         MA8
-        lda     nmiFlag
-        sta     lastNmi
+        lda     padHead
+        sta     padTail                 ; the load took a while: start from fresh input
         lda     #$81
         sta     NMITIMEN
         MA16

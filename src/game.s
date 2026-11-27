@@ -1,27 +1,30 @@
 ; =============================================================================
 ; game: pads, palettes, line-of-fight angle, joint-frame pointers, camera
 ; =============================================================================
-readPads:
+readPads:                           ; take the oldest queued sample (one per logic tick)
         .a8
-:       lda     HVBJOY              ; wait for auto-joypad read to finish
-        and     #$01
-        bne     :-
         rep     #$20
         .a16
-        lda     JOY1L
+        lda     padTail
+        and     #PADQ_LEN - 1
+        asl     a
+        asl     a
         tax
+        lda     padQ,x
+        sta     pad
         eor     padOld
-        and     JOY1L
+        and     pad
         sta     padP
-        stx     padOld
-        stx     pad
-        lda     JOY2L
-        tax
+        lda     pad
+        sta     padOld
+        lda     padQ+2,x
+        sta     pad+2
         eor     padOld+2
-        and     JOY2L
+        and     pad+2
         sta     padP+2
-        stx     padOld+2
-        stx     pad+2
+        lda     pad+2
+        sta     padOld+2
+        inc     padTail
         sep     #$20
         .a8
         rts
