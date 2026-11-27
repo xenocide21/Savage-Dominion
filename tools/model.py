@@ -375,12 +375,20 @@ def simplify(h, tol):
         h.pop(bi)
     return h
 
+DETAIL_MIN_AREA = 14        # design units^2 (about 3 screen pixels)
+
+def area(h):
+    return abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(h, h[1:] + h[:1]))) / 2
+
 def encode(part, scale_o, tol=None):
     """-> bytes for the Super FX: [npolys] then per polygon [colour, n, (s7, o4) * n]"""
     polys = []
     for col, pts in part.polys:
         q = []
         h = hull(pts)
+        # frame-rate budget: an un-inked detail of only a few pixels costs the Super FX
+        # nearly as much to set up as a large polygon, so leave it out (never on heads)
+        if not col & 0x80 and part.name != "head" and area(h) < DETAIL_MIN_AREA: continue
         if tol: h = simplify(h, tol)
         for p in h:
             s, o = part.bone.to_bone(p)

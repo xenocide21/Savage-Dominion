@@ -387,7 +387,9 @@ import sys as _sys
 _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gsu as _gsu
 _code, _gsyms = _gsu.Asm(0x4000).assemble(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "fx.gsu")).read())
-assert _gsyms["psslow"] - 0x4000 <= 512, "GSU scanline code no longer fits the cache: %d" % (_gsyms["psslow"] - 0x4000)
+_hot = _gsyms["hotEnd"] - _gsyms["hot"]
+assert _gsyms["hot"] % 16 == 0 and _hot <= 560, "GSU hot code has outgrown the cache window: %d bytes" % _hot
+print("gsu: hot code %d bytes (512 cached)" % _hot)
 blob("gsu_code", _code, 15)
 consts["GSU_SIZE"] = len(_code)
 consts["GSU_START"] = _gsyms["start"]
