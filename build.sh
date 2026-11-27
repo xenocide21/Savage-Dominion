@@ -7,7 +7,7 @@ python3 tools/gen_assets.py
 python3 tools/fighters.py
 python3 tools/menu_art.py
 python3 tools/spc.py
-python3 tools/mkcfg.py 32                       # 1 MB LoROM
+python3 tools/mkcfg.py 64                       # 2 MB LoROM
 cd build
 for f in ../src/main.s assets.s fighters.s menu_art.s; do
   ca65 --cpu 65816 -I . -I ../src --bin-include-dir . -g -o $(basename $f .s).o $f

@@ -34,7 +34,9 @@ ST_DASH    = 15
 ST_DIZZY   = 16
 ST_FINISH  = 17         ; performing a finisher (scripted)
 ST_FINISHED = 18        ; on the receiving end
-JUMPV      = 1180       ; jump launch speed (1/256 hu per tick)
+JUMPV      = 1900       ; jump launch speed (1/256 hu per tick): apex about 63 hu
+JUMPF      = 580        ; forward drift: carries a jump over a nearby opponent
+JUMPB      = 440
 WALKF      = 440
 WALKB      = 330
 SIDEV      = 600
@@ -49,12 +51,13 @@ PH_END   = 2
 PH_MATCH = 3
 
 HPMAX   = 208
-GRAV    = 80            ; 1/256 hu per tick^2
+GRAV    = 80            ; 1/256 hu per tick^2 (launches, juggles, knockdowns)
+JGRAV   = 112           ; a fighter's own jump is quicker: about 34 ticks of air
 FWD     = PAD_RIGHT
 BACK    = PAD_LEFT
 BUTTONS = PAD_Y | PAD_X | PAD_B | PAD_A | PAD_L
 
-; move record (11 bytes, from fighters.py)
+; move record (16 bytes, from fighters.py)
 MR_ANIM = 0
 MR_A0   = 1
 MR_A1   = 2
@@ -66,6 +69,12 @@ MR_AIR  = 6             ; 1 = air attack
 MR_STEP = 8
 MR_HJ   = 9
 MR_TOTAL = 10
+MR_FLAGS = 11
+MR_HX0   = 12           ; hitbox around the striking joint: x (forward) 12..13, y (up) 14..15
+MR_SIZE  = 16
+HURT     = NJOINT * 3   ; offset of the two hurtboxes (x0 x1 y0 y1) in a frame
+JUGGLEY  = 28           ; extra vertical reach against a fighter being juggled
+MAXUSES  = 3             ; times one move may land per combo before cancels refuse it
 
 ; ---------------------------------------------------------------- match setup
 gameInit:
@@ -135,9 +144,7 @@ newRound:
         stz     fTapT,x
         stz     fTapD,x
         stz     fCombo,x
-        stz     fUsed1,x
-        stz     fUsed2,x
-        stz     fUsed3,x
+        jsr     clearUses
         lda     #1
         sta     fBreak,x
         lda     #HPMAX
@@ -642,26 +649,58 @@ tryCancel:
         jsr     pickMove
         bcc     @no
         sta     tmp4
-        asl     a
-        tay
-        lda     bitTab,y
-        sta     tmp5
-        lda     fChar,x
-        and     #$00FF
-        asl     a
-        tay
-        lda     cancTab,y
-        and     tmp5
+        ; only moves flagged as cancel targets, and not ones used up in this combo
+        lda     fMove,x
+        pha
+        lda     tmp4
+        sta     fMove,x
+        jsr     setMovePtr
+        pla
+        sta     fMove,x
+        ldy     #MR_FLAGS
+        lda     [mp],y
+        and     #MVF_CANCEL
         beq     @no
-        lda     fUsed3,x
-        and     tmp5
-        bne     @no
+        lda     tmp4
+        jsr     useIndex
+        lda     fUses,y
+        and     #$00FF
+        cmp     #MAXUSES
+        bcs     @no
+        lda     tmp4
+        jsr     setMovePtr              ; (mp: back to the current move)
         lda     tmp4
         bra     startBuf
-@no:    clc
+@no:    jsr     setMovePtr
+        clc
         rts
-bitTab: .word   1, 2, 4, 8, $10, $20, $40, $80, $100, $200, $400, $800, $1000, $2000, $4000, $8000
-cancTab: .word  CH0_CANC, CH1_CANC, CH2_CANC, CH3_CANC, CH4_CANC, CH5_CANC
+
+; A = move id, X = slot -> Y = index into fUses (clobbers A)
+useIndex:
+        .a16
+        cpx     #0
+        beq     :+
+        clc
+        adc     #MAXMOVES
+:       tay
+        rts
+
+; X = slot: a new combo starts, forget which moves were used
+clearUses:
+        .a16
+        lda     #0
+        jsr     useIndex
+        phx
+        tyx
+        MA8
+        ldy     #MAXMOVES
+:       stz     fUses,x
+        inx
+        dey
+        bne     :-
+        MA16
+        plx
+        rts
 
 ; A = chain-from move ($FF none) -> carry set, A = move id (from the input buffer)
 pickMove:
@@ -768,14 +807,15 @@ findMove:
         bra     @lp
 @no:    clc
         rts
-inTab:  .word   .loword(ch0_inputs), .loword(ch1_inputs), .loword(ch2_inputs)
-        .word   .loword(ch3_inputs), .loword(ch4_inputs), .loword(ch5_inputs)
 
 ; A = move id
 startAttack:
         .a16
         sta     fMove,x
-        jsr     setMovePtr
+        lda     fAir,x
+        bne     :+
+        jsr     turnToward              ; ground moves aim at the opponent
+:       jsr     setMovePtr
         ldy     #MR_LVL
         lda     [mp],y
         and     #$00FF
@@ -798,14 +838,10 @@ startAttack:
 setMovePtr:
         .a16
         lda     fMove,x
-        sta     tmp0
         asl     a
         asl     a
         asl     a
-        clc
-        adc     tmp0
-        adc     tmp0
-        adc     tmp0                    ; *11
+        asl     a                       ; *16 = MR_SIZE
         sta     tmp0
         lda     fChar,x
         and     #$00FF
@@ -821,18 +857,6 @@ setMovePtr:
         sta     mp+2
         MA16
         rts
-moveTab: .faraddr ch0_move
-        .byte   0
-        .faraddr ch1_move
-        .byte   0
-        .faraddr ch2_move
-        .byte   0
-        .faraddr ch3_move
-        .byte   0
-        .faraddr ch4_move
-        .byte   0
-        .faraddr ch5_move
-        .byte   0
 
 stAttack:
         .a16
@@ -904,10 +928,10 @@ startJump:
         ldy     #0
         bit     #FWD
         beq     :+
-        ldy     #420
+        ldy     #JUMPF
 :       bit     #BACK
         beq     :+
-        ldy     #.loword(-330)
+        ldy     #.loword(-JUMPB)
 :       tya
         sta     fJumpV,x
         lda     #SFX_SWISH
@@ -917,7 +941,6 @@ startJump:
 
 stJump:
         .a16
-        jsr     turnToward
         lda     fAirAtk,x
         bne     :+
         jsr     tryAttack
@@ -948,6 +971,7 @@ toLand:
         stz     fVY,x
         lda     #ST_LAND
         sta     fState,x
+        jsr     turnToward              ; may have landed on the other side
         lda     #AN_CROUCH
         jmp     setAnim
 
@@ -1401,17 +1425,6 @@ stFinished:
         jmp     setAnim
 :       rts
 
-finTab: .word   .loword(ch0_fin), .loword(ch1_fin), .loword(ch2_fin), .loword(ch3_fin), .loword(ch4_fin), .loword(ch5_fin)
-finNameTab: .word .loword(ch0_finName), .loword(ch1_finName), .loword(ch2_finName)
-        .word   .loword(ch3_finName), .loword(ch4_finName), .loword(ch5_finName)
-finLoTab: .word CH0_FINLO, CH1_FINLO, CH2_FINLO, CH3_FINLO, CH4_FINLO, CH5_FINLO
-finHiTab: .word CH0_FINHI, CH1_FINHI, CH2_FINHI, CH3_FINHI, CH4_FINHI, CH5_FINHI
-finSeqTab: .byte >CH0_FINHI, <CH0_FINHI, >CH0_FINLO, <CH0_FINLO
-        .byte   >CH1_FINHI, <CH1_FINHI, >CH1_FINLO, <CH1_FINLO
-        .byte   >CH2_FINHI, <CH2_FINHI, >CH2_FINLO, <CH2_FINLO
-        .byte   >CH3_FINHI, <CH3_FINHI, >CH3_FINLO, <CH3_FINLO
-        .byte   >CH4_FINHI, <CH4_FINHI, >CH4_FINLO, <CH4_FINLO
-        .byte   >CH5_FINHI, <CH5_FINHI, >CH5_FINLO, <CH5_FINLO
 
 ; A = FWD (dash in) or BACK (backdash)
 startDash:
@@ -1499,9 +1512,17 @@ stRingout:
 ; gravity; carry set when landing on the floor (ring-out falls through)
 airPhys:
         .a16
+        ldy     #GRAV
+        lda     fState,x
+        cmp     #ST_JUMP
+        beq     @own
+        cmp     #ST_ATTACK
+        bne     @fall               ; (finisher leaps keep the floatier arc)
+@own:   ldy     #JGRAV
+@fall:  sty     tmp6
         lda     fVY,x
         sec
-        sbc     #GRAV
+        sbc     tmp6
         sta     fVY,x
         MA8
         clc
@@ -1658,7 +1679,7 @@ addPos:
         sta     fZ,x
         rts
 
-; ease facing toward the opponent (4 units per tick): sidesteps make attacks whiff
+; face the opponent (side view: left or right, at once)
 turnToward:
         .a16
         lda     lineAng
@@ -1667,32 +1688,6 @@ turnToward:
         clc
         adc     #128
 :       and     #$00FF
-        sec
-        sbc     fFace,x
-        and     #$00FF
-        cmp     #$0080
-        bcc     :+
-        ora     #$FF00
-:       ora     #0                      ; A = signed difference
-        bmi     @neg
-        cmp     #5
-        bcc     @snap
-        lda     fFace,x
-        clc
-        adc     #4
-        bra     @st
-@neg:   cmp     #.loword(-4)
-        bcs     @snap
-        lda     fFace,x
-        sec
-        sbc     #4
-        bra     @st
-@snap:  lda     lineAng
-        cpx     #0
-        beq     @st
-        clc
-        adc     #128
-@st:    and     #$00FF
         sta     fFace,x
         rts
 
@@ -1864,76 +1859,31 @@ hitCheck:
         lda     fCrouch,y
         beq     @geo
         rts
-@geo:   ; opponent position in the attacker's local frame
+@geo:   ; how far in front of the attacker the opponent stands (negative: behind)
         lda     fX,y
         sec
         sbc     fX,x
-        sta     tmp2                    ; dx
-        lda     fZ,y
-        sec
-        sbc     fZ,x
-        sta     tmp3                    ; dz
+        sta     tmp4
         lda     fFace,x
-        and     #$00FF
-        sta     tmp7
-        lda     tmp2
-        sta     mBw
-        MA8
-        ldy     tmp7
-        lda     cos8,y
-        sta     mB
-        jsr     smul16x8
-        .a16
-        sta     tmp4                    ; dx*cos
-        lda     tmp3
-        sta     mBw
-        MA8
-        ldy     tmp7
-        lda     sin8,y
-        sta     mB
-        jsr     smul16x8
-        .a16
-        clc
-        adc     tmp4
-        sta     tmp4                    ; lf = forward distance
-        lda     tmp2
-        sta     mBw
-        MA8
-        ldy     tmp7
-        lda     sin8,y
-        sta     mB
-        jsr     smul16x8
-        .a16
-        sta     tmp5
-        lda     tmp3
-        sta     mBw
-        MA8
-        ldy     tmp7
-        lda     cos8,y
-        sta     mB
-        jsr     smul16x8
-        .a16
-        eor     #$FFFF
+        and     #$0080
+        beq     :+
+        lda     #0
         sec
-        adc     tmp5
-        sta     tmp5                    ; ll = lateral offset (+ = local z)
-        lda     fLevel,x
+        sbc     tmp4
+        sta     tmp4
+:       lda     fLevel,x
         cmp     #9
-        bne     @joint
+        bne     @boxes
         ; throw range: in front, close
         lda     tmp4
         sec
         sbc     #8
         cmp     #40
         bcs     @miss
-        lda     tmp5
-        clc
-        adc     #24
-        cmp     #49
-        bcs     @miss
         jmp     resolveHit
 @miss:  rts
-@joint: ; the striking joint (hand / foot) this frame
+@boxes: ; the attacker's hitbox: around the striking joint of this frame,
+        ; tmp0..tmp1 forward, tmp2..tmp3 up (from the floor)
         txy
         cpx     #0
         beq     :+
@@ -1947,35 +1897,146 @@ hitCheck:
         and     #$00FF
         tay
         lda     [jp],y                  ; jx (lo) / jy (hi)
-        and     #$00FF
-        bit     #$0080
-        beq     :+
-        ora     #$FF00
-:       sta     tmp0
-        iny
-        iny
-        lda     [jp],y                  ; jz
-        and     #$00FF
-        bit     #$0080
-        beq     :+
-        ora     #$FF00
-:       sta     tmp1
-        ; |lf - jx| <= 20 and |ll - jz| <= 20
-        lda     tmp4
-        sec
-        sbc     tmp0
-        clc
-        adc     #20
-        cmp     #45
-        bcs     @miss
+        sta     tmp5
+        jsr     sext
+        sta     tmp0
+        sta     tmp1
         lda     tmp5
-        sec
-        sbc     tmp1
+        xba
+        jsr     sext
         clc
-        adc     #20
-        cmp     #41
-        bcs     @miss
-        ; fall through
+        adc     fY,x
+        sta     tmp2
+        sta     tmp3
+        ldy     #MR_HX0
+        lda     [mp],y
+        jsr     sext
+        clc
+        adc     tmp0
+        sta     tmp0
+        iny
+        lda     [mp],y
+        jsr     sext
+        clc
+        adc     tmp1
+        sta     tmp1
+        iny
+        lda     [mp],y
+        jsr     sext
+        clc
+        adc     tmp2
+        sta     tmp2
+        iny
+        lda     [mp],y
+        jsr     sext
+        clc
+        adc     tmp3
+        sta     tmp3
+        ; juggled opponents are a little easier to catch
+        ldy     oi
+        lda     fState,y
+        cmp     #ST_AIR
+        bne     :+
+        lda     tmp2
+        sec
+        sbc     #JUGGLEY
+        sta     tmp2
+        lda     tmp3
+        clc
+        adc     #JUGGLEY
+        sta     tmp3
+:       ; the defender's hurtboxes: same facing (we are behind them) or mirrored
+        lda     fFace,x
+        eor     fFace,y
+        and     #$0080
+        sta     tmp5
+        cpy     #0
+        beq     :+
+        ldy     #3
+:       lda     fPtr,y
+        sta     jp
+        lda     fPtr+1,y
+        sta     jp+1
+        ldy     #HURT
+        jsr     boxHit
+        bcs     @hit
+        ldy     #HURT + 4
+        jsr     boxHit
+        bcs     @hit
+        rts
+@hit:   jmp     resolveHit
+
+; Y = offset of a hurtbox (x0 x1 y0 y1) at [jp]; carry set if the hitbox
+; tmp0..tmp3 overlaps it.  tmp4 = defender's forward distance, tmp5 = 0 when both
+; face the same way.  X preserved.
+boxHit:
+        .a16
+        phx
+        ldx     oi
+        lda     [jp],y                  ; x0
+        jsr     sext
+        sta     tmp6
+        iny
+        lda     [jp],y                  ; x1
+        jsr     sext
+        sta     tmp7
+        lda     tmp5
+        beq     @same
+        lda     tmp6                    ; facing each other: x0..x1 -> -x1..-x0
+        eor     #$FFFF
+        inc     a
+        pha
+        lda     tmp7
+        eor     #$FFFF
+        inc     a
+        sta     tmp6
+        pla
+        sta     tmp7
+@same:  lda     tmp4
+        clc
+        adc     tmp6                    ; their near edge
+        sec
+        sbc     tmp1                    ; beyond our far edge?
+        beq     :+
+        bpl     @no
+:       lda     tmp4
+        clc
+        adc     tmp7                    ; their far edge
+        sec
+        sbc     tmp0                    ; short of our near edge?
+        bmi     @no
+        iny
+        lda     [jp],y                  ; y0
+        jsr     sext
+        clc
+        adc     fY,x
+        sec
+        sbc     tmp3
+        beq     :+
+        bpl     @no
+:       iny
+        lda     [jp],y                  ; y1
+        jsr     sext
+        clc
+        adc     fY,x
+        sec
+        sbc     tmp2
+        bmi     @no
+        plx
+        sec
+        rts
+@no:    plx
+        clc
+        rts
+
+; low byte of A, sign extended
+sext:
+        .a16
+        and     #$00FF
+        bit     #$0080
+        beq     :+
+        ora     #$FF00
+:       rts
 
 ; X = attacker, oi = defender, mp = move
 resolveHit:
@@ -2021,10 +2082,23 @@ resolveHit:
         clc
         adc     tmp6
         sta     tmp6                    ; remaining + advantage (ticks)
-        lda     fFace,x
-        and     #$00FF
-        sta     tmp7                    ; push direction
+        ; push the defender away from the attacker (not along the attacker's facing:
+        ; a crossing-up jump strikes from behind its own back) and turn it that way
         ldy     oi
+        lda     fX,y
+        sec
+        sbc     fX,x
+        beq     @level
+        bmi     :+
+        lda     #0
+        bra     @push
+:       lda     #128
+        bra     @push
+@level: lda     fFace,x
+        and     #$00FF
+@push:  sta     tmp7                    ; push direction
+        eor     #128
+        sta     fFace,y
         ; ---- blocked?
         lda     fLevel,x
         cmp     #9
@@ -2096,29 +2170,17 @@ resolveHit:
         cmp     #ST_AIR
         beq     :+
         stz     fCombo,x
-        stz     fUsed1,x
-        stz     fUsed2,x
-        stz     fUsed3,x
+        jsr     clearUses
 :       inc     fCombo,x
-        lda     fMove,x                 ; each move counts 3 times at most per combo
-        asl     a
-        tay
-        lda     bitTab,y
-        sta     tmp3
-        and     fUsed2,x
-        beq     :+
-        lda     tmp3
-        ora     fUsed3,x
-        sta     fUsed3,x
-:       lda     tmp3
-        and     fUsed1,x
-        beq     :+
-        lda     tmp3
-        ora     fUsed2,x
-        sta     fUsed2,x
-:       lda     tmp3
-        ora     fUsed1,x
-        sta     fUsed1,x
+        lda     fMove,x                 ; count this move against the combo
+        jsr     useIndex
+        MA8
+        lda     fUses,y
+        cmp     #MAXUSES
+        bcs     :+
+        inc     a
+        sta     fUses,y
+:       MA16
         lda     fCombo,x
         cmp     #2
         bcc     :+
@@ -2597,7 +2659,7 @@ phMatch:
         cmp     #2
         bcc     @say
         lda     ladder
-        cmp     #4
+        cmp     #LADDER_LEN - 1
         bcc     :+
         ldy     #.loword(txtChamp)
 @say:   jmp     setMsg
@@ -2618,7 +2680,7 @@ phMatch:
         jmp     toMenu                  ; lost: game over
 :       inc     ladder
         lda     ladder
-        cmp     #5
+        cmp     #LADDER_LEN
         bcc     :+
         jmp     champion                ; won the tournament!
 :       jsr     oppChar
@@ -2721,21 +2783,21 @@ oppChar:
         and     #$00FF
         sec
         adc     ladder                  ; char + 1 + ladder
-:       cmp     #6
+:       cmp     #NFIGHTER
         bcc     :+
-        sbc     #6
+        sbc     #NFIGHTER
         bra     :-
 :       rts
 
-; random 0..5
-rnd6:
+; random fighter, 0 .. NFIGHTER-1
+rndChar:
         .a16
         jsr     rngStep
         lda     rng
         and     #$001F
-:       cmp     #6
+:       cmp     #NFIGHTER
         bcc     :+
-        sbc     #6
+        sbc     #NFIGHTER
         bra     :-
 :       rts
 
@@ -2760,9 +2822,9 @@ toTitle:
         lda     #1
         sta     demo
         stz     p2Human
-        jsr     rnd6
+        jsr     rndChar
         sta     fChar
-        jsr     rnd6
+        jsr     rndChar
         sta     fChar+2
         lda     #1
         sta     hudChg
@@ -2880,7 +2942,7 @@ selPad:
         beq     :++
         lda     fChar,x
         inc     a
-        cmp     #6
+        cmp     #NFIGHTER
         bcc     :+
         lda     #0
 :       jsr     selSet
@@ -2890,7 +2952,7 @@ selPad:
         lda     fChar,x
         dec     a
         bpl     :+
-        lda     #5
+        lda     #NFIGHTER - 1
 :       jsr     selSet
 :       lda     tmp4
         and     #(PAD_A | PAD_X | PAD_Y | PAD_START)
@@ -3192,13 +3254,6 @@ txtP1:    .byte "P1", 0
 txtP2:    .byte "P2", 0
 txtCPU:   .byte "CPU", 0
 txtReady: .byte "READY!", 0
-styleTab: .word .loword(sty0), .loword(sty1), .loword(sty2), .loword(sty3), .loword(sty4), .loword(sty5)
-sty0:     .byte "KARATE", 0
-sty1:     .byte "KUNG FU", 0
-sty2:     .byte "WRESTLING", 0
-sty3:     .byte "VIKING", 0
-sty4:     .byte "BOXING", 0
-sty5:     .byte "CAPOEIRA", 0
 
 ; ---------------------------------------------------------------- HUD (BG3 rows 1..4)
 ; row 0: names + round pips, row 1: health bars + clock, row 3: message
@@ -3836,6 +3891,3 @@ aiLevel:
 @hi:    lda     #3
 :       rts
 
-aiTab:  .word   .loword(ch0_ai), .loword(ch1_ai), .loword(ch2_ai), .loword(ch3_ai), .loword(ch4_ai), .loword(ch5_ai)
-aiChTab: .word  .loword(ch0_aichain), .loword(ch1_aichain), .loword(ch2_aichain)
-        .word   .loword(ch3_aichain), .loword(ch4_aichain), .loword(ch5_aichain)

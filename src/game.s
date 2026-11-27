@@ -82,7 +82,6 @@ flashPal: .word 0
         .repeat 15, i
         .word   ((31 - (14 - i) / 3) << 10) | ((31 - (14 - i) / 4) << 5) | 31
         .endrepeat
-palTab: .faraddr ch0_pal, ch1_pal, ch2_pal, ch3_pal, ch4_pal, ch5_pal
 
 ; lineAng = angle of (p2 - p1)
 facing:
@@ -138,7 +137,7 @@ facing:
         stz     lineAng+1
         rts
 
-; X = fighter*2 -> fPtr = anim frame data + frame * 60 (each anim entry: addr, count, bank)
+; X = fighter*2 -> fPtr = anim frame data + frame * FRAMESZ (each anim entry: addr, count, bank)
 framePtr:
         .a8
         stx     tmp7
@@ -164,18 +163,14 @@ framePtr:
         ldy     #0
         lda     [tmp0],y            ; frame data address
         sta     tmp2
-        lda     fFrame,x
+        lda     #0                  ; fFrame * FRAMESZ (shift and add)
+        .repeat 8, i
         asl     a
-        asl     a                   ; *4
-        sta     tmp4
-        asl     a
-        asl     a                   ; *16
+        .if (FRAMESZ >> (7 - i)) & 1
         clc
-        adc     tmp4                ; *20
-        sta     tmp4
-        asl     a
-        clc
-        adc     tmp4                ; *60
+        adc     fFrame,x
+        .endif
+        .endrepeat
         clc
         adc     tmp2
         ldy     tmp7                ; slot -> fPtr offset (0 or 3)
@@ -192,19 +187,6 @@ framePtr:
         ldx     tmp7
         rts
 
-; per character anim table (lo word, bank), 4 bytes per char
-animTabLo: .word .loword(ch0_anim)
-animTabBk: .byte ^ch0_anim, 0
-           .word .loword(ch1_anim)
-           .byte ^ch1_anim, 0
-           .word .loword(ch2_anim)
-           .byte ^ch2_anim, 0
-           .word .loword(ch3_anim)
-           .byte ^ch3_anim, 0
-           .word .loword(ch4_anim)
-           .byte ^ch4_anim, 0
-           .word .loword(ch5_anim)
-           .byte ^ch5_anim, 0
 
 ; camera: side on, tracking the midpoint between the fighters, stopping near the walls
 cameraFollow:

@@ -19,21 +19,9 @@
 .import near_tiles, near_map, far_tiles, far_map, floor_k, math_fight, math_title, tm_title
 .import bg_pal, font2, bar2, obj_tiles
 .import gsu_code, gsu_circ, sin8, cos8, recip, atan64, scale8
-.import ch0_frames, ch0_anim, ch0_balls, ch0_nballs, ch0_pal, ch0_move
-.import ch1_frames, ch1_anim, ch1_balls, ch1_nballs, ch1_pal, ch1_move
-.import ch2_frames, ch2_anim, ch2_balls, ch2_nballs, ch2_pal, ch2_move
-.import ch3_frames, ch3_anim, ch3_balls, ch3_nballs, ch3_pal, ch3_move
-.import ch4_frames, ch4_anim, ch4_balls, ch4_nballs, ch4_pal, ch4_move
-.import ch5_frames, ch5_anim, ch5_balls, ch5_nballs, ch5_pal, ch5_move
+.import palTab, ballListTab, moveTab, segTab, partTab, shapeTab, animTabLo, animTabBk
+.import inTab, aiTab, aiChTab, finTab, finNameTab, finLoTab, finHiTab, finSeqTab, styleTab
 .import fighterNames, animLoop, ballCount, segCount
-.import ch0_inputs, ch1_inputs, ch2_inputs, ch3_inputs, ch4_inputs, ch5_inputs
-.import ch0_ai, ch1_ai, ch2_ai, ch3_ai, ch4_ai, ch5_ai
-.import ch0_aichain, ch1_aichain, ch2_aichain, ch3_aichain, ch4_aichain, ch5_aichain
-.import ch0_fin, ch1_fin, ch2_fin, ch3_fin, ch4_fin, ch5_fin
-.import ch0_finName, ch1_finName, ch2_finName, ch3_finName, ch4_finName, ch5_finName
-.import ch0_segs, ch1_segs, ch2_segs, ch3_segs, ch4_segs, ch5_segs
-.import ch0_parts, ch1_parts, ch2_parts, ch3_parts, ch4_parts, ch5_parts
-.import ch0_shapes, ch1_shapes, ch2_shapes, ch3_shapes, ch4_shapes, ch5_shapes
 .export frameCount
 
 .include "vars.inc"
@@ -480,7 +468,7 @@ setupHdma:
         .byte   "SAVAGE DOMINION      "  ; 21 bytes
         .byte   $30                 ; LoROM + FastROM
         .byte   $15                 ; Super FX (GSU-2) + RAM + battery
-        .byte   $0A                 ; 1 MB
+        .byte   $0B                 ; 2 MB
         .byte   $06                 ; 64 KB battery-backed Game Pak RAM (records at $70:F000)
         .byte   $01
         .byte   $33

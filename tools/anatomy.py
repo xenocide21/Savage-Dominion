@@ -201,7 +201,7 @@ def _limb_layer(p, mat, bone, st, ball, t_cut, inflate=0.0, t0=None, t1=None, ca
 
 def build(ch, J, style):
     """anatomy + costume parts; head and hair chains come from the legacy builder"""
-    PH = PHYSIQUE[ch["name"]]
+    PH = PHYSIQUE[ch.get("model", ch["name"])]
     male = ch.get("male", True)
     legacy = Mdl.build(ch, J, dict(style, headk=PH.get("headk", 1.0), neckblend=True, neckw=PH["neckw"]))
     keep = {p.name: p for p in legacy}

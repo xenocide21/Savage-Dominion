@@ -249,7 +249,7 @@ def lineup_centres():
 def make_lineup():
     W, H = 256, 224
     layers = []
-    for ci, ch in enumerate(F.ROSTER):
+    for ci, ch in enumerate(F.ROSTER[:6]):
         im = Image.new("RGB", (W, H), (0, 0, 0))
         pal = Mo.palette_rgb(ch, F)
         pal = [(255, 0, 255)] + pal[1:]
@@ -267,7 +267,7 @@ def make_lineup():
     idx = Image.new("L", (256, 256), 0); pidx = idx.load()
     owner = [[None] * 32 for _ in range(32)]
     cnt = [[[0] * 6 for _ in range(32)] for _ in range(32)]
-    fpal = [Mo.palette_rgb(ch, F) for ch in F.ROSTER]
+    fpal = [Mo.palette_rgb(ch, F) for ch in F.ROSTER[:6]]
     px = [l.load() for l in layers]
     for y in range(H):
         for x in range(W):
@@ -314,7 +314,7 @@ def movelist_text(ch):
         mark = {0: "", 1: "*", 2: "^", 3: "*"}[m["react"]]
         if m["lvl"] == 9: mark = ""
         put(" " + (m["label"][:16] + mark).ljust(18) + inp)
-    fin = F.FINISHERS[ch["name"]]
+    fin = F.FINISHERS[F.key(ch)]
     code = " ".join({"F": "->", "B": "<-", "D": "DN", "Y": "Y", "X": "X", "Bk": "B", "A": "A", "L": "L"}[t] for t in fin["seq"].split())
     while len(rows) < 21: put("")
     put(" FINISHER: " + fin["title"])
@@ -357,7 +357,7 @@ def main():
     for p, cols in BG3PAL.items():
         for i, c in enumerate(cols): cg[p * 4 + 1 + i] = c5(*c)
     for i, c in enumerate(SCEN): cg[16 + 1 + i] = c5(*c)
-    for ci, ch in enumerate(F.ROSTER):
+    for ci, ch in enumerate(F.ROSTER[:6]):
         fp = F.fxpal(ch["colors"])
         for i in range(1, 16): cg[(2 + ci) * 16 + i] = fp[i]
     open(os.path.join(OUT, "menu_pal.bin"), "wb").write(b"".join(bytes([c & 0xFF, c >> 8]) for c in cg))
@@ -397,13 +397,13 @@ def main():
     for y in range(224):
         for x in range(256):
             if si[x, y]: pp[x, y] = scol[si[x, y]]
-    fpal = [Mo.palette_rgb(ch, F) for ch in F.ROSTER]
+    fpal = [Mo.palette_rgb(ch, F) for ch in F.ROSTER[:6]]
     for y in range(224):
         for x in range(256):
             if li[x, y]: pp[x, y] = fpal[lpal[y // 8][x // 8] - 2][li[x, y]]
     prev.paste(lprev, (16, 8))
     d = ImageDraw.Draw(prev)
-    for ci, ch in enumerate(F.ROSTER):
+    for ci, ch in enumerate(F.ROSTER[:6]):
         d.text((lineup_centres()[ci] - 14, 84 if ci % 2 == 0 else 74), ch["name"], fill=(250, 246, 230))
     prev.resize((768, 672), Image.NEAREST).save(os.path.join(PREV, "splash.png"))
     with open(os.path.join(OUT, "menu.inc"), "w") as f:

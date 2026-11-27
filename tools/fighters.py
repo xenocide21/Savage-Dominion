@@ -149,11 +149,15 @@ def base_segs(B, M):
 
 ROSTER = []
 
+def key(ch):
+    """the name a fighter's move list, finisher and model are filed under"""
+    return ch.get("model", ch["name"])
+
 def fighter(**kw):
     ROSTER.append(kw)
 
 # 1 KAZE - karate master: white gi, black belt, red headband tails, spiky black hair
-fighter(name="KAZE", styleName="Karate", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=0, uarm=2, farm=0, hand=0), male=True,
+fighter(name="KAZE", caption="KARATE", styleName="Karate", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=0, uarm=2, farm=0, hand=0), male=True,
         body=dict(leg=21, torso=24, neck=5, headr=8, shw=11, hipw=6.5, uarm=15, farm=14, chestr=10.5, headsz=8.5),
         colors=[SKIN["tan"], (40, 36, 44), (236, 234, 226), (200, 40, 40)],   # skin, hair, gi, red
         extra=[(3, (-2, 8, 0)), (3, (-9, 4, 2)), (3, (-14, -2, 3)), (0, (2, 3, 0))],
@@ -162,7 +166,7 @@ fighter(name="KAZE", styleName="Karate", mats=dict(top=2, hip=2, thigh=2, shin=2
         speed=1.0, power=1.0, weight=1.0)
 
 # 2 LIN - kung fu: red tunic, twin buns, gold trim, light and quick
-fighter(name="LIN", styleName="Kung Fu", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=1, uarm=2, farm=0, hand=0), male=False,
+fighter(name="LIN", caption="KUNG FU", styleName="Kung Fu", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=1, uarm=2, farm=0, hand=0), male=False,
         body=dict(leg=19, torso=21, neck=5, headr=7.5, shw=9, hipw=6, uarm=13, farm=12, chestr=9, headsz=7.8, hipr=8.5, waist=7.5),
         colors=[SKIN["light"], (30, 24, 30), (210, 40, 54), (232, 190, 80)],
         extra=[(3, (-1, 5, 5.5)), (3, (-1, 5, -5.5)), (3, (-6, -3, 0)), (0, (3, -6, 0))],
@@ -171,7 +175,7 @@ fighter(name="LIN", styleName="Kung Fu", mats=dict(top=2, hip=2, thigh=2, shin=2
         speed=1.18, power=0.82, weight=0.85)
 
 # 3 BRUTUS - heavyweight wrestler: huge, bald with beard, red trunks, wristbands
-fighter(name="BRUTUS", styleName="Pro Wrestling", mats=dict(top=0, hip=2, thigh=0, shin=3, feet=3, uarm=0, farm=0, hand=0), male=True,
+fighter(name="BRUTUS", caption="WRESTLING", styleName="Pro Wrestling", mats=dict(top=0, hip=2, thigh=0, shin=3, feet=3, uarm=0, farm=0, hand=0), male=True,
         body=dict(leg=22, torso=26, neck=4, headr=8, shw=14, hipw=8, uarm=16, farm=15, chestr=14, headsz=8.8, hipr=12, waist=12.5, shr=8, thighr=8.5),
         colors=[SKIN["brown"], (40, 30, 24), (190, 30, 40), (240, 210, 70)],
         extra=[(3, (4, -5, 0)), (3, (2, -8, 0)), (6, (0, 2, 0)), (9, (0, 2, 0))],
@@ -180,7 +184,7 @@ fighter(name="BRUTUS", styleName="Pro Wrestling", mats=dict(top=0, hip=2, thigh=
         speed=0.78, power=1.32, weight=1.4)
 
 # 4 VALKA - Nordic warrior: long blonde braid, silver shoulder guards, fur boots
-fighter(name="VALKA", styleName="Viking Brawler", mats=dict(top=2, hip=2, thigh=2, shin=3, feet=3, uarm=0, farm=0, hand=0, shoulder=3), male=False,
+fighter(name="VALKA", caption="VIKING", styleName="Viking Brawler", mats=dict(top=2, hip=2, thigh=2, shin=3, feet=3, uarm=0, farm=0, hand=0, shoulder=3), male=False,
         body=dict(leg=22, torso=23, neck=5, headr=7.8, shw=10.5, hipw=6.5, uarm=15, farm=14, chestr=10, headsz=8, hipr=9.5),
         colors=[SKIN["light"], (240, 206, 110), (70, 110, 180), (200, 206, 214)],
         extra=[(3, (-8, 0, 0)), (3, (-12, -9, 0)), (3, (-14, -19, 0)), (1, (-2, -2, 0))],
@@ -189,7 +193,7 @@ fighter(name="VALKA", styleName="Viking Brawler", mats=dict(top=2, hip=2, thigh=
         speed=0.95, power=1.12, weight=1.1)
 
 # 5 JACK MERCER (rough stand-in, to be remodelled) - boxer: beard, bare torso, black trunks, red gloves
-fighter(name="JACK", styleName="Boxing", mats=dict(top=0, hip=2, thigh=0, shin=0, feet=2, uarm=0, farm=0, hand=3), male=True,
+fighter(name="JACK", caption="BOXING", styleName="Boxing", mats=dict(top=0, hip=2, thigh=0, shin=0, feet=2, uarm=0, farm=0, hand=3), male=True,
         body=dict(leg=20, torso=23, neck=5, headr=8, shw=11.5, hipw=6.5, uarm=14, farm=13, chestr=11, headsz=8.4),
         colors=[SKIN["light"], (92, 52, 30), (44, 40, 52), (220, 40, 40)],
         extra=[(3, (0, 9, 0)), (3, (-6, 8, 0)), (3, (5, 7, 0)), (3, (5, 1, 0))],
@@ -198,7 +202,7 @@ fighter(name="JACK", styleName="Boxing", mats=dict(top=0, hip=2, thigh=0, shin=0
         speed=1.08, power=0.95, weight=1.0)
 
 # 6 LUNA REYES (rough stand-in, to be remodelled) - capoeira: teal outfit, long ponytail, gold sash
-fighter(name="LUNA", styleName="Capoeira", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=0, uarm=0, farm=0, hand=0), male=False,
+fighter(name="LUNA", caption="CAPOEIRA", styleName="Capoeira", mats=dict(top=2, hip=2, thigh=2, shin=2, feet=0, uarm=0, farm=0, hand=0), male=False,
         body=dict(leg=23, torso=21, neck=5, headr=7.5, shw=9.5, hipw=6, uarm=14, farm=13, chestr=9, headsz=7.8, hipr=8.5, waist=7.5),
         colors=[SKIN["brown"], (52, 30, 24), (30, 150, 124), (244, 184, 60)],
         extra=[(3, (-7, 4, 0)), (3, (-12, -3, 0)), (3, (-14, -11, 0)), (2, (-6, -2, 3))],
@@ -220,6 +224,33 @@ def active_window(ch, keys, hj):
     while b < hi and xs[b] >= thr: b += 1
     if b - a < 2: b = a + 2
     return a, b
+
+# ---- hit detection (side view: x forward, y up, in the game's joint units) --------
+def hurt_boxes(ch, J):
+    """the places this pose can be hit: [torso and head, legs], each (x0, x1, y0, y1).
+    Arms are left out, so reaching out with a punch doesn't make you easier to hit."""
+    B = ch["body"]
+    def box(pts):
+        return (q(min(J[i][0] - r for i, r in pts)), q(max(J[i][0] + r for i, r in pts)),
+                q(min(J[i][1] - r for i, r in pts)), q(max(J[i][1] + r for i, r in pts)))
+    chest, head = B["chestr"], B["headsz"]
+    torso = [(0, 8), (1, chest), (2, 4), (3, head), (4, 5), (7, 5), (10, 5), (13, 5)]
+    legs = [(i, 5) for i in range(10, 16)]
+    return [box(torso), box(legs)]
+
+def hit_box(mv, J, a0, a1, air):
+    """-> (x0, x1, y0, y1) around the striking joint while the move is active"""
+    if mv["box"]:
+        back, front, down, up = mv["box"]
+    elif air:
+        # air attacks cover the whole limb and reach just behind the jumper (cross-ups)
+        reach = min(q(J[f][mv["hj"]][0]) for f in range(a0, min(a1, len(J))))
+        back, front, down, up = max(14, min(55, reach + 14)), 8, 20, 9
+    else:
+        back, front, down, up = 14, 8, 9, 9
+    return (-back, front, -down, up)
+
+FRAMESZ = NJ * 3 + 8                # joints, then two hurtboxes
 
 def build_balls(ch):
     B = ch["body"]
@@ -269,9 +300,11 @@ def P(**kw): return kw
 
 GAME_SPEED = 1.32       # MMA pace: every attack / walk cycle plays this much faster
 
-def M(name, inputs, keys, hj, lvl, dmg, react=0, adv=-4, step=3, label=None):
+def M(name, inputs, keys, hj, lvl, dmg, react=0, adv=-4, step=3, label=None, box=None):
+    """box: this move's hitbox (back, front, down, up) around the striking joint,
+    in game units, to override the default for its kind (see hit_box)"""
     return dict(name=name, inputs=inputs.split(), keys=keys, hj=hj, lvl=lvl, dmg=dmg,
-                react=react, adv=adv, step=step, label=label or name.upper())
+                react=react, adv=adv, step=step, label=label or name.upper(), box=box)
 
 # ---- shared keyframe library (fighters re-use these with their own inputs) ----
 K = {}
@@ -354,7 +387,7 @@ MOVESETS = {
   "LIN": [    # Wing chun / long fist: lightning palm flurries, spinning kicks
     M("palm",       "Y",          K["palm"],      6, 0,  5, 0,  3, 2, "CHAIN PALM"),
     M("palm2",      "palm>Y",     K["palm2"],     9, 0,  6, 0,  2, 2, "CHAIN PALM 2"),
-    M("palm3",      "palm2>Y",    K["palm3"],     9, 1, 14, 1, -6, 5, "TWIN DRAGON PALM"),
+    M("palm3",      "palm2>Y",    K["palm3"],     9, 1, 14, 1, -6, 5, "TWIN DRAGON PALM", box=(14, 8, 24, 9)),
     M("tiger",      "X palm>X",   K["tiger"],     9, 1, 12, 0, -3, 4, "TIGER CLAW"),
     M("snapkick",   "B palm>B palm2>B", K["snapkick"], 12, 1, 10, 0, -2, 3, "SNAP KICK"),
     M("crescent",   "A snapkick>A", K["crescent"], 12, 0, 16, 1, -8, 2, "CRESCENT KICK"),
@@ -384,15 +417,15 @@ MOVESETS = {
     M("jkick",      "jB jA",      K["jstomp"],    12, 1, 18, 0, 0, 0, "BODY DROP"),
   ],
   "VALKA": [  # Viking brawler: hammer fists, spinning backfist, knees and heel drops
-    M("hammer",     "Y",          K["hammer"],    6, 1, 10, 0,  0, 3, "HAMMER FIST"),
-    M("hammer2",    "hammer>Y",   K["hammer2"],   9, 1, 12, 0, -2, 3, "HAMMER FIST 2"),
+    M("hammer",     "Y",          K["hammer"],    6, 1, 10, 0,  0, 3, "HAMMER FIST", box=(14, 8, 30, 9)),
+    M("hammer2",    "hammer>Y",   K["hammer2"],   9, 1, 12, 0, -2, 3, "HAMMER FIST 2", box=(14, 8, 30, 9)),
     M("straight",   "X",          K["straight"],  9, 0, 14, 0, -4, 5, "STRAIGHT RIGHT"),
     M("knee",       "B straight>B", K["knee"],    11, 1, 15, 0, -3, 4, "KNEE STRIKE"),
     M("roundhouse", "A hammer2>A", K["highkick"], 12, 0, 18, 1, -8, 2, "ROUNDHOUSE"),
     M("lowkick",    "dB",         K["lowkick"],   12, 2, 10, 0, -2, 2, "LOW KICK"),
     M("uppercut",   "dX knee>X",  K["uppercut"],  9, 1, 15, 2, -12, 4, "UPPERCUT"),
     M("sweep",      "dA",         K["sweep"],     12, 2, 14, 3, -14, 0, "SWEEP"),
-    M("dhammer",    "fX",         K["dhammer"],   6, 1, 22, 1, -10, 6, "DOUBLE HAMMER"),
+    M("dhammer",    "fX",         K["dhammer"],   6, 1, 22, 1, -10, 6, "DOUBLE HAMMER", box=(14, 8, 30, 9)),
     M("flyknee",    "fB",         K["flyknee"],   11, 1, 20, 2, -14, 10, "FLYING KNEE"),
     M("backfist",   "bX",         K["backfist"],  6, 0, 18, 0, -6, 4, "SPIN BACKFIST"),
     M("heeldrop",   "bA",         K["heeldrop"],  12, 1, 20, 1, -12, 4, "HEEL DROP"),
@@ -439,7 +472,7 @@ for _n, _ms in MOVESETS.items():
         for _i in _m["inputs"]:
             if ">" in _i: assert _i.split(">")[0] in _names, (_n, _i)
 
-def moves_for(ch): return MOVESETS[ch["name"]]
+def moves_for(ch): return MOVESETS[key(ch)]
 
 def move_keys(ch, mv):
     """keyframes at this fighter's speed and the global MMA pace"""
@@ -579,19 +612,19 @@ FIN_OPS = {"anim": 1, "wait": 2, "dim": 3, "launch": 4, "jump": 5, "slow": 6, "n
 
 def fin_seq_words(ch):
     toks = []
-    for t in FINISHERS[ch["name"]]["seq"].split():
+    for t in FINISHERS[key(ch)]["seq"].split():
         toks.append(FIN_TOK["Bk" if t == "Bk" else t])
     assert len(toks) == 4
     hi = (toks[0] << 8) | toks[1]; lo = (toks[2] << 8) | toks[3]
     return lo, hi
 
 def fin_legend(ch):
-    return " ".join(FIN_ARROW[t] for t in FINISHERS[ch["name"]]["seq"].split())
+    return " ".join(FIN_ARROW[t] for t in FINISHERS[key(ch)]["seq"].split())
 
 def fin_script(ch, base, ms):
     out = []
     names = {m["name"]: i for i, m in enumerate(ms)}
-    for st in FINISHERS[ch["name"]]["steps"]:
+    for st in FINISHERS[key(ch)]["steps"]:
         op = FIN_OPS[st[0]]
         if st[0] == "anim":
             nm, t = st[1], st[2]
@@ -617,7 +650,8 @@ BTN = {"Y": 1, "X": 2, "B": 3, "A": 4, "L": 5}
 DIRC = {"": 0, "f": 1, "b": 2, "d": 3, "j": 4}
 BTNPAD = {"Y": "PAD_Y", "X": "PAD_X", "B": "PAD_B", "A": "PAD_A", "L": "PAD_L"}
 DIRPAD = {"": "0", "f": "PAD_RIGHT", "b": "PAD_LEFT", "d": "PAD_DOWN"}
-MAXMOVES = 16
+MAXMOVES = 32
+MVF_CANCEL = 1       # move flag: a connecting hit may cancel into this move
 
 def move_table(ch):
     """-> list of (button, dir, from-move or 255, move) input entries; chains first"""
@@ -644,13 +678,64 @@ def legend_inputs(m, ms):
             d = inp[:-1]; out.append((nice[d] if d else "") + inp[-1])
     return out
 
+class Packer:
+    """hands out 32 KB ROM banks for fighter data (banks 32-63 of the 2 MB cart)"""
+    FIRST_BANK, END_BANK = 32, 64
+    def __init__(self): self.bank, self.used = self.FIRST_BANK, 0
+    def place(self, size):
+        """-> assembler line selecting a bank with room for `size` bytes in one piece"""
+        assert size <= 0x8000, size
+        if self.used + size > 0x8000: self.bank, self.used = self.bank + 1, 0
+        assert self.bank < self.END_BANK, "fighter data no longer fits in the ROM"
+        self.used += size
+        return '.segment "BANK%d"' % self.bank
+
+def roster_tables():
+    """the per-fighter pointer tables the game indexes by character number"""
+    n = len(ROSTER)
+    labels = ["ch%d" % i for i in range(n)]
+    out = ['.segment "RODATA"']
+    def table(name, lines):
+        out.append(".export %s" % name)
+        out.append("%s:" % name)
+        out.extend("    " + l for l in lines)
+    table("palTab", [".faraddr %s_pal" % c for c in labels])
+    table("ballListTab", [".faraddr %s_balls" % c for c in labels])
+    for tab, suffix in (("moveTab", "move"), ("segTab", "segs"), ("partTab", "parts"), ("shapeTab", "shapes")):
+        table(tab, [".faraddr %s_%s\n    .byte 0" % (c, suffix) for c in labels])
+    out.append(".export animTabLo, animTabBk")
+    for i, c in enumerate(labels):
+        lo, bk = ("animTabLo:", "animTabBk:") if i == 0 else ("", "")
+        out.append("%s .word .loword(%s_anim)" % (lo, c))
+        out.append("%s .byte ^%s_anim, 0" % (bk, c))
+    for tab, suffix in (("inTab", "inputs"), ("aiTab", "ai"), ("aiChTab", "aichain"), ("finTab", "fin"), ("finNameTab", "finName")):
+        table(tab, [".word .loword(%s_%s)" % (c, suffix) for c in labels])
+    seqs = [fin_seq_words(c) for c in ROSTER]
+    table("finLoTab", [".word %d" % lo for lo, hi in seqs])
+    table("finHiTab", [".word %d" % hi for lo, hi in seqs])
+    table("finSeqTab", [".byte %d, %d, %d, %d" % (hi >> 8, hi & 255, lo >> 8, lo & 255) for lo, hi in seqs])
+    table("styleTab", [".word .loword(%s_caption)" % c for c in labels])
+    for c, ch in zip(labels, ROSTER):
+        out.append('%s_caption: .byte "%s", 0' % (c, ch["caption"]))
+    return out
+
+# development only: ROSTER_PAD=<n> fills the roster up to n with copies, to test
+# that the game copes with a larger cast
+for _i in range(len(ROSTER), int(os.environ.get("ROSTER_PAD", "0"))):
+    _c = dict(ROSTER[_i % 6]); _c["model"] = _c["name"]; _c["name"] = "TEST%02d" % (_i + 1)
+    ROSTER.append(_c)
+
 def main():
     os.makedirs(OUT, exist_ok=True); os.makedirs(PREV, exist_ok=True)
     asm = ['; generated by tools/fighters.py', '.include "consts.inc"', '.include "regs.inc"']
-    sheet = Image.new("RGB", (6 * 150, 2 * 240), (30, 26, 40))
+    sheet = Image.new("RGB", (len(ROSTER) * 150, 2 * 240), (30, 26, 40))
     base = list(ANIMS.keys())
-    consts = {"NJOINT": NJ, "NFIGHTER": len(ROSTER), "NBASEANIM": len(base)}
+    assert 6 <= len(ROSTER) <= 32
+    consts = {"NJOINT": NJ, "NFIGHTER": len(ROSTER), "LADDER_LEN": min(5, len(ROSTER) - 1), "NBASEANIM": len(base),
+              "MAXMOVES": MAXMOVES, "MVF_CANCEL": MVF_CANCEL,
+              "FRAMESZ": FRAMESZ}
     for i, n in enumerate(base): consts["AN_" + n.upper()] = i
+    banks = Packer()
     legend = ["# Move lists", "", "Controls: D-pad moves; Up jumps (Up+toward / Up+away jump in / out);",
               "Down crouches; R guards;",
               "double-tap toward / away dashes in / backdashes.  Y punch, X power punch,",
@@ -670,20 +755,20 @@ def main():
         name = "ch%d" % ci
         ms = moves_for(ch)
         assert len(ms) <= MAXMOVES
-        base_frames = bytearray(); move_frames = bytearray()
-        atab = []
-        for an in base:
-            J = bake(ch, expand(ch, ANIMS[an]))
-            atab.append(("%s_frames" % name, len(base_frames), len(J)))
+        frames = bytearray()
+        atab = []                       # (offset into the frame file, frame count)
+        def add_anim(J):
+            atab.append((len(frames), len(J)))
             for fr in J:
-                for (x, y, z) in fr: base_frames += bytes([q(x) & 0xFF, q(y) & 0xFF, q(z) & 0xFF])
+                for (x, y, z) in fr: frames.extend((q(x) & 0xFF, q(y) & 0xFF, q(z) & 0xFF))
+                for b in hurt_boxes(ch, fr): frames.extend(v & 0xFF for v in b)
+        for an in base: add_anim(bake(ch, expand(ch, ANIMS[an])))
+        base_size = len(frames)
         rec = []
         for mi, mv in enumerate(ms):
             kk = move_keys(ch, mv)
             J = bake(ch, expand(ch, kk))
-            atab.append(("%s_mframes" % name, len(move_frames), len(J)))
-            for fr in J:
-                for (x, y, z) in fr: move_frames += bytes([q(x) & 0xFF, q(y) & 0xFF, q(z) & 0xFF])
+            add_anim(J)
             total = sum(d for d, _ in kk)
             if mv["lvl"] == 9:
                 a0s = kk[0][0]; a1s = a0s + 2
@@ -691,16 +776,23 @@ def main():
                 a0s, a1s = active_window(ch, kk, mv["hj"])
             air = any(i.startswith("j") for i in mv["inputs"])
             rec.append((len(base) + mi, a0s, a1s, mv["lvl"], min(60, int(mv["dmg"] * ch["power"])), mv["react"],
-                        1 if air else 0, mv["adv"] & 0xFF, mv["step"], mv["hj"] * 3, total))
-        assert len(base_frames) < 0x8000 - 9000, (ch["name"], len(base_frames))
-        assert len(move_frames) < 0x8000, (ch["name"], len(move_frames))
-        open(os.path.join(OUT, name + "_frames.bin"), "wb").write(base_frames)
-        open(os.path.join(OUT, name + "_mframes.bin"), "wb").write(move_frames)
-        asm.append('.segment "BANK%d"' % (16 + ci))
-        asm.append('.export %s_frames, %s_anim, %s_balls, %s_nballs, %s_pal, %s_move, %s_segs' % ((name,) * 7))
+                        1 if air else 0, mv["adv"] & 0xFF, mv["step"], mv["hj"] * 3, total,
+                    MVF_CANCEL if mv["lvl"] != 9 and not air else 0)
+                       + tuple(v & 0xFF for v in hit_box(mv, J, a0s, a1s, air)))
+        open(os.path.join(OUT, name + "_frames.bin"), "wb").write(frames)
+        # each animation sits whole inside one bank; different ones may be in different banks
+        for ai, (off, n) in enumerate(atab):
+            size = n * FRAMESZ
+            asm.append(banks.place(size))
+            asm.append('%s_a%d: .incbin "%s_frames.bin", %d, %d' % (name, ai, name, off, size))
         import model as _M
         blob, table = _M.export(ch, sys.modules[__name__])
-        asm.append('.export %s_shapes, %s_parts' % (name, name))
+        segs = base_segs(ch["body"], ch["mats"])
+        balls = build_balls(ch)
+        # everything else about the fighter goes together in one piece
+        asm.append(banks.place(2 + len(blob) + 1 + 10 * len(table) + 5 * len(segs) + 4 * len(atab)
+                               + 1 + 5 * len(balls) + 64 + len(rec) * len(rec[0])))
+        asm.append('.export %s_shapes, %s_parts, %s_anim, %s_balls, %s_pal, %s_move, %s_segs' % ((name,) * 7))
         asm.append('%s_shapes: .word %d' % (name, len(blob)))
         for i in range(0, len(blob), 24):
             asm.append('    .byte ' + ", ".join(str(b) for b in blob[i:i + 24]))
@@ -708,16 +800,13 @@ def main():
         for (a, b, side, bn, bf, on, of) in table:
             asm.append('    .byte %d, %d, %d, %d, %d, 0' % (a * 2, b * 2, side, bn & 0xFF, bf & 0xFF))
             asm.append('    .word %d, %d' % (on, of))
-        segs = base_segs(ch["body"], ch["mats"])
         asm.append('%s_segs:' % name)
         for (a, b, wa, wb, m) in segs:
             asm.append('    .byte %d, %d, %d, %d, %d' % (a * 2, b * 2, int(wa * 4 * SCALE), int(wb * 4 * SCALE), m))
-        asm.append('%s_frames: .incbin "%s_frames.bin"' % (name, name))
         # anim table: frame data address (lo word), frame count, bank
         asm.append('%s_anim:' % name)
-        for (lab, off, n) in atab:
-            asm.append('    .word .loword(%s + %d)\n    .byte %d, ^%s' % (lab, off, n, lab))
-        balls = build_balls(ch)
+        for ai, (off, n) in enumerate(atab):
+            asm.append('    .word .loword(%s_a%d)\n    .byte %d, ^%s_a%d' % (name, ai, n, name, ai))
         asm.append('%s_nballs: .byte %d' % (name, len(balls)))
         asm.append('%s_balls:' % name)
         for (a, b, t, r, m) in balls:
@@ -725,11 +814,10 @@ def main():
         cols = ch["colors"]
         alt = [tuple(int(c * 0.6) for c in cols[3]), tuple(min(255, int(c * 0.9 + 40)) for c in cols[2])]
         asm.append('%s_pal: .word %s' % (name, ", ".join(str(c) for c in fxpal(cols) + fxpal([cols[0], cols[1], alt[0], alt[1]]))))
-        # moves: anim, active start/end, level, damage, reaction, air flag, block adv, step, hit joint*3, total
+        # moves: anim, active start/end, level, damage, reaction, air flag, block adv, step, hit joint*3, total,
+        # flags, hitbox x0, x1, y0, y1
         asm.append('%s_move:' % name)
         for r in rec: asm.append('    .byte ' + ", ".join(str(v) for v in r))
-        asm.append('.segment "BANK%d"' % (22 + ci))
-        asm.append('%s_mframes: .incbin "%s_mframes.bin"' % (name, name))
         # inputs / CPU tables (bank 0)
         asm.append('.segment "RODATA"')
         asm.append('.export %s_inputs, %s_ai, %s_aichain' % (name, name, name))
@@ -745,16 +833,10 @@ def main():
             c = [e for e in tab if e[2] == i]
             chainbtn.append(["0", "PAD_Y", "PAD_X", "PAD_B", "PAD_A", "PAD_L"][c[0][0]] if c else "0")
         asm.append('%s_aichain: .word ' % name + ", ".join(chainbtn))
-        canc = 0
-        for i, m in enumerate(ms):
-            if m["lvl"] != 9 and not any(x.startswith("j") for x in m["inputs"]): canc |= 1 << i
-        consts["%s_CANC" % name.upper()] = canc
         # finisher: script, title, input code
         asm.append('.export %s_fin, %s_finName' % (name, name))
         asm.append('%s_fin: .byte ' % name + ", ".join(str(b) for b in fin_script(ch, len(base), ms)))
-        asm.append('%s_finName: .byte "%s", 0' % (name, FINISHERS[ch["name"]]["title"]))
-        flo, fhi = fin_seq_words(ch)
-        consts["%s_FINLO" % name.upper()] = flo; consts["%s_FINHI" % name.upper()] = fhi
+        asm.append('%s_finName: .byte "%s", 0' % (name, FINISHERS[key(ch)]["title"]))
         # legend
         legend.append("## %s - %s" % (ch["name"], ch.get("styleName", "")))
         legend.append("")
@@ -765,7 +847,7 @@ def main():
             if m["lvl"] == 9: note = "throw (unblockable, close)"
             legend.append("| %s | %s | %s | %s |" % (m["label"].title(), " / ".join(legend_inputs(m, ms)),
                           {0: "high", 1: "mid", 2: "low", 9: "throw"}[m["lvl"]], note))
-        legend.append("| **FINISHER: %s** | %s | - | only on a dizzy opponent, close range |" % (FINISHERS[ch["name"]]["title"].title(), fin_legend(ch)))
+        legend.append("| **FINISHER: %s** | %s | - | only on a dizzy opponent, close range |" % (FINISHERS[key(ch)]["title"].title(), fin_legend(ch)))
         legend.append("")
         # preview: stance + a kick
         J = fk(ch, ch["stance"])
@@ -774,13 +856,15 @@ def main():
         J2 = bake(ch, kk)[min(len(kk) - 1, 8)]
         preview(ch, J2, balls, cols, sheet, ci * 150 + 75, 440)
         ImageDraw.Draw(sheet).text((ci * 150 + 50, 8), ch["name"] + (" (M)" if ch["male"] else " (F)"), fill=(255, 255, 255))
-        print("%-7s base %5d  moves %5d  (%d moves, %d input entries)" % (ch["name"], len(base_frames), len(move_frames), len(ms), len(tab)))
+        print("%-7s base %5d  moves %5d  (%d moves, %d input entries)" % (ch["name"], base_size, len(frames) - base_size, len(ms), len(tab)))
     sheet.save(os.path.join(PREV, "roster.png"))
     asm.append('.segment "RODATA"\n.export fighterNames, animLoop')
     asm.append('fighterNames: ' + "\n".join('    .byte "%-7s"' % c["name"] for c in ROSTER))
     asm.append('animLoop: .byte ' + ", ".join("1" if n in LOOPING else "0" for n in base))
     asm.append('.export ballCount\nballCount: .byte ' + ", ".join(str(len(build_balls(c))) for c in ROSTER))
     asm.append('.export segCount\nsegCount: .byte ' + ", ".join(str(len(base_segs(c["body"], c["mats"]))) for c in ROSTER))
+    asm.extend(roster_tables())
+    print("fighter data: banks %d-%d" % (banks.FIRST_BANK, banks.bank))
     open(os.path.join(OUT, "fighters.s"), "w").write("\n".join(asm) + "\n")
     open(os.path.join(OUT, "movelist.md"), "w").write("\n".join(legend) + "\n")
     with open(os.path.join(OUT, "fighters.inc"), "w") as f:

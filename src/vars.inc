@@ -188,8 +188,7 @@ fDashV: .res 4          ; dash speed (signed)
 fCombo: .res 4          ; hits in the current combo (attacker)
 chainFrom: .res 2
 comboT: .res 2
-fUsed1: .res 4          ; moves used once in the current combo (bit per move)
-fUsed2: .res 4          ; ... used twice (no more cancels into them)
+fUses:  .res 2 * MAXMOVES ; times each move has landed in the current combo (bytes)
 fBreak: .res 4          ; combo breakers left this round
 comboBuf: .res 32
 aiLv:   .res 2
@@ -212,7 +211,6 @@ finOrb: .res 2
 finP1: .res 2
 finP2: .res 2
 finP3: .res 2
-fUsed3: .res 4
 fBufV: .res 4          ; stick when the buffered button was pressed
 ; ---- menus / presentation
 dispMode: .res 2        ; 0 fight display (Mode 7 + Super FX), 1 menu display

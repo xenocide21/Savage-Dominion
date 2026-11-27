@@ -750,8 +750,6 @@ lerpT:
         inc     a
 :       rts
 
-ballListTab:
-        .faraddr ch0_balls, ch1_balls, ch2_balls, ch3_balls, ch4_balls, ch5_balls
 
 ; ---------------------------------------------------------------- shadows (2 x 16x16 per fighter, palette 7)
 ; =============================================================================
@@ -1849,18 +1847,6 @@ bbY:    .a16
         sta     curMaxY
 :       rts
 
-segTab: .faraddr ch0_segs
-        .byte   0
-        .faraddr ch1_segs
-        .byte   0
-        .faraddr ch2_segs
-        .byte   0
-        .faraddr ch3_segs
-        .byte   0
-        .faraddr ch4_segs
-        .byte   0
-        .faraddr ch5_segs
-        .byte   0
 
 ; A16 -> clamp to 0..255
 clamp8: .a16
@@ -2065,30 +2051,6 @@ fighterParts:
         .a8
         rts
 
-partTab: .faraddr ch0_parts
-        .byte   0
-        .faraddr ch1_parts
-        .byte   0
-        .faraddr ch2_parts
-        .byte   0
-        .faraddr ch3_parts
-        .byte   0
-        .faraddr ch4_parts
-        .byte   0
-        .faraddr ch5_parts
-        .byte   0
-shapeTab: .faraddr ch0_shapes
-        .byte   0
-        .faraddr ch1_shapes
-        .byte   0
-        .faraddr ch2_shapes
-        .byte   0
-        .faraddr ch3_shapes
-        .byte   0
-        .faraddr ch4_shapes
-        .byte   0
-        .faraddr ch5_shapes
-        .byte   0
 
 ; copy both fighters' shapes into Game Pak RAM ($70:7000 / $70:9000); GSU must be idle
 loadShapes:

@@ -444,7 +444,7 @@ STYLES = {
 
 def parts_for(ch, F):
     J = F.fk(ch, ch["stance"])
-    st = STYLES[ch["name"]]
+    st = STYLES[ch.get("model", ch["name"])]
     if st.get("v2"):
         import anatomy
         return anatomy.build(ch, J, st)
@@ -476,7 +476,7 @@ def render(ch, F, J, pal, scale=0.93, flip=False, img=None, at=(0, 0)):
         order.append((z + bias * 8 / hu, q))
     order.sort(key=lambda t: t[0])
     for _, p in order:
-        data = encode(p, so, STYLES[ch["name"]].get("simplify"))
+        data = encode(p, so, STYLES[ch.get("model", ch["name"])].get("simplify"))
         A = scr(p.a); Bp = scr(p.b)
         dx, dy = Bp[0] - A[0], Bp[1] - A[1]
         L = math.hypot(dx, dy) or 1
@@ -508,7 +508,7 @@ def part_bias(ch, p):
     """(near, far) depth bias of a part, as written to the part table"""
     if not p.side: return p.depth, p.depth
     bn = {"uarm": 1, "farm": 2, "thigh": 0, "shin": 0}[p.name[:-1]]
-    if p.name.startswith("shin") and STYLES[ch["name"]].get("v2"): bn = 1   # knee: shin dome over the thigh end
+    if p.name.startswith("shin") and STYLES[ch.get("model", ch["name"])].get("v2"): bn = 1   # knee: shin dome over the thigh end
     return bn, bn - 3
 
 def export(ch, F):
@@ -516,7 +516,7 @@ def export(ch, F):
     so = 4 * F.SCALE
     blob = bytearray(); table = []
     for p in parts_for(ch, F):
-        tol = STYLES[ch["name"]].get("simplify")
+        tol = STYLES[ch.get("model", ch["name"])].get("simplify")
         offN = len(blob); blob += encode(p, so, tol)
         side = {None: 0, "n": 1, "f": 2}[p.side]
         if p.side:
